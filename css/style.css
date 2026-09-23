@@ -4,6 +4,15 @@
    - 1023px 이하: 세로 타임라인
    ========================================================= */
 
+/* 제목용 고산자체: 제목 글자만 남긴 subset (tools/subset_font.py 로 생성) */
+@font-face {
+  font-family: "Gosanja";
+  src: url("../assets/fonts/gosanja-subset.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --navy: #2d3c85;
   --green: #456d2a;
@@ -15,6 +24,8 @@
   --road: #d5e1ca;
   --ink: #111;
   --bg: #fff;
+
+  --font-title: "Gosanja", "Pretendard Variable", Pretendard, sans-serif;
 
   --ease: cubic-bezier(.22, .8, .3, 1);
   --arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12h13M12 5l7 7-7 7' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -41,6 +52,16 @@ ol, ul { margin: 0; padding: 0; list-style: none; }
 h1, h2, p { margin: 0; }
 a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }
 
+/* 제목류는 고산자체 (굵기가 하나뿐이라 가짜 볼드 방지) */
+.school__name,
+.map__title,
+.stage__link,
+.badge {
+  font-family: var(--font-title);
+  font-weight: normal;
+  font-synthesis: none;
+}
+
 :focus-visible {
   outline: 3px solid var(--dash-hot);
   outline-offset: 3px;
@@ -56,7 +77,6 @@ a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transpar
   border-radius: 50%;
   background: var(--green);
   color: #fff;
-  font-weight: 700;
   transition: transform .35s var(--ease), box-shadow .35s var(--ease);
 }
 
@@ -64,8 +84,7 @@ a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transpar
   display: inline-flex;
   align-items: center;
   color: var(--green);
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.03em;
 }
 
 .stage__name {
@@ -226,20 +245,18 @@ a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transpar
 
   .school__name {
     color: var(--maroon);
-    font-size: calc(39 * var(--u));
-    font-weight: 800;
-    letter-spacing: -0.015em;
+    font-size: calc(35.3 * var(--u));
+    letter-spacing: -0.035em;
+    margin-top: calc(5 * var(--u));
   }
 
   .map__title {
     position: absolute;
     left: calc(261 * var(--u));
-    top: calc(155 * var(--u));
+    top: calc(158.5 * var(--u));
     color: var(--navy);
-    font-size: calc(66 * var(--u));
-    font-weight: 800;
-    line-height: calc(83 * var(--u));
-    letter-spacing: 0.01em;
+    font-size: calc(58.8 * var(--u));
+    line-height: calc(81 * var(--u));
   }
 
   /* ---- 단계 배치: 시안 좌표(--x, --y, --w) 그대로 ---- */
@@ -263,13 +280,12 @@ a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transpar
   .badge {
     width: calc(60.3 * var(--u));
     height: calc(60.3 * var(--u));
-    font-size: calc(34 * var(--u));
+    font-size: calc(33 * var(--u));
   }
 
   .stage__link {
     gap: calc(16 * var(--u));
-    font-size: calc(36.5 * var(--u));
-    letter-spacing: -0.035em;
+    font-size: calc(32 * var(--u));
     white-space: nowrap;
   }
 
@@ -387,16 +403,14 @@ a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transpar
 
   .school__name {
     color: var(--maroon);
-    font-size: 20px;
-    font-weight: 800;
+    font-size: 19px;
+    letter-spacing: -0.03em;
   }
 
   .map__title {
     color: var(--navy);
-    font-size: clamp(34px, 8vw, 52px);
-    font-weight: 800;
-    line-height: 1.2;
-    letter-spacing: -0.02em;
+    font-size: clamp(32px, 7.5vw, 48px);
+    line-height: 1.3;
   }
 
   .stages {
@@ -460,7 +474,7 @@ a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transpar
 
   .stage__link {
     gap: 12px;
-    font-size: 24px;
+    font-size: 22px;
     padding-right: 8px;
   }
 
