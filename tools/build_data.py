@@ -5,9 +5,10 @@
   2. data/materials.csv       — 시트를 CSV로 내려받아 저장소에 올린 파일
 
 시트 열 (첫 줄 제목 그대로):
-  항목ID | 분류 | 제목 | 파일 | 유튜브 | 설명
+  항목ID | 분류 | 소분류 | 제목 | 파일 | 유튜브 | 설명
   - 항목ID : 로드맵 항목 (README 표 참고). 필수
   - 분류   : 비우면 분류 없음. 채우면 항목 안에서 분류 카드로 묶임
+  - 소분류 : 선택. 같은 분류 안에서 칩 버튼(전체/1학년/2학년…)으로 걸러 봄
   - 제목   : 필수
   - 파일   : PDF. assets/docs/ 아래 경로(예: kls/국어-계획.pdf) 또는 구글 드라이브 공유 링크
   - 유튜브 : 영상 주소. 파일과 유튜브 중 하나만
@@ -33,7 +34,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 DOCS = ROOT / "assets" / "docs"
 MAX_MB = 25  # Cloudflare Pages 파일 하나당 한도
 
-COLS = {"항목ID": "item", "분류": "group", "제목": "title", "파일": "file", "유튜브": "youtube", "설명": "desc"}
+COLS = {"항목ID": "item", "분류": "group", "소분류": "sub", "제목": "title", "파일": "file", "유튜브": "youtube", "설명": "desc"}
 
 
 def item_ids():
@@ -45,8 +46,14 @@ def read_rows():
     url = os.environ.get("SHEET_CSV_URL", "").strip()
     if url:
         print(f"시트 읽는 중: {url[:60]}…")
-        with urllib.request.urlopen(url, timeout=30) as r:
-            text = r.read().decode("utf-8-sig")
+        try:
+            with urllib.request.urlopen(url, timeout=30) as r:
+                text = r.read().decode("utf-8-sig")
+        except Exception as e:  # noqa: BLE001
+            sys.exit(f"오류: 시트를 읽지 못했습니다 ({e}). 시트의 '웹에 게시'가 CSV로 되어 있는지, "
+                     "게시한 탭을 지우거나 이름을 바꾸지 않았는지 확인해 주세요.")
+        if text.lstrip().startswith("<"):
+            sys.exit("오류: 시트 주소가 CSV가 아닙니다. '웹에 게시'에서 형식을 CSV로 골라 나온 주소를 넣어 주세요.")
     else:
         path = ROOT / "data" / "materials.csv"
         print(f"파일 읽는 중: {path.relative_to(ROOT)}")
@@ -119,6 +126,8 @@ def main():
         m = {"item": item, "title": row["title"]}
         if row.get("group"):
             m["group"] = row["group"]
+        if row.get("sub"):
+            m["sub"] = row["sub"]
 
         if yt:
             vid = youtube_id(yt)

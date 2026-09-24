@@ -279,6 +279,55 @@ html.has-modal { overflow: hidden; }
   align-content: start;
 }
 
+/* 자료 목록 영역 (소분류 칩 + 목록) */
+.mside {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+}
+
+.mside .mlist { flex: 1; border-right: 0; }
+
+/* 소분류 칩: 한눈에 보이고 한 번에 눌러짐 (드롭다운보다 태블릿에서 편함) */
+.subfilter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 14px 12px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.subfilter__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color .2s, border-color .2s, color .2s;
+}
+
+.subfilter__btn small { color: var(--muted); font-size: 12px; font-weight: 500; }
+.subfilter__btn:hover { border-color: var(--green); }
+
+.subfilter__btn[aria-pressed="true"] {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+
+.subfilter__btn[aria-pressed="true"] small { color: rgba(255, 255, 255, .8); }
+.mlist__item[hidden] { display: none; }
+
 /* 자료 목록 (자료가 2개 이상일 때) */
 .mlist {
   display: flex;
@@ -709,6 +758,17 @@ html.has-modal { overflow: hidden; }
   .viewer__body.has-list {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .mside { border-right: 0; border-bottom: 1px solid var(--line); }
+  .mside .mlist { border-bottom: 0; }
+
+  .subfilter {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 8px 12px 0;
+    border-bottom: 0;
+    scrollbar-width: none;
   }
 
   .mlist {

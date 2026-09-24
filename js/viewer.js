@@ -319,22 +319,38 @@
       return;
     }
 
+    // 소분류(시트의 "소분류" 칸): 목록 위 칩 버튼으로 걸러 보기
+    const subs = [...new Set(list.map((m) => (m.sub || '').trim()).filter(Boolean))];
+    const subBar = subs.length ? `
+      <div class="subfilter" role="group" aria-label="소분류">
+        <button class="subfilter__btn" type="button" data-sub="" aria-pressed="true">전체 <small>${list.length}</small></button>
+        ${subs.map((x) => `
+          <button class="subfilter__btn" type="button" data-sub="${esc(x)}" aria-pressed="false">${esc(x)}
+            <small>${list.filter((m) => (m.sub || '').trim() === x).length}</small></button>`).join('')}
+      </div>` : '';
+
     body.classList.toggle('has-list', list.length > 1);
     body.innerHTML = `
       ${list.length > 1 ? `
-        <nav class="mlist" aria-label="자료 목록">
-          ${list.map((m, k) => `
-            <button class="mlist__item" type="button" data-k="${k}">
-              <span class="mlist__icon is-${esc(m.type)}">${ICON[m.type] || ICON.pdf}</span>
-              <span class="mlist__text"><span class="mlist__title">${esc(m.title)}</span>
-              <span class="mlist__type">${m.type === 'video' ? '영상' : '문서 · PDF'}</span></span>
-            </button>`).join('')}
-        </nav>` : ''}
+        <div class="mside">
+          ${subBar}
+          <nav class="mlist" aria-label="자료 목록">
+            ${list.map((m, k) => `
+              <button class="mlist__item" type="button" data-k="${k}" data-sub="${esc((m.sub || '').trim())}">
+                <span class="mlist__icon is-${esc(m.type)}">${ICON[m.type] || ICON.pdf}</span>
+                <span class="mlist__text"><span class="mlist__title">${esc(m.title)}</span>
+                <span class="mlist__type">${m.type === 'video' ? '영상' : '문서 · PDF'}${!subs.length || !m.sub ? '' : ` · ${esc(m.sub)}`}</span></span>
+              </button>`).join('')}
+          </nav>
+        </div>` : ''}
       <section class="pane" aria-live="polite"></section>`;
 
     const pane = body.querySelector('.pane');
     const buttons = [...body.querySelectorAll('.mlist__item')];
+    let currentK = -1;
     const select = (k) => {
+      if (k === currentK) return;
+      currentK = k;
       buttons.forEach((b, j) => b.setAttribute('aria-current', j === k ? 'true' : 'false'));
       cleanup();
       cleanup = () => {};
@@ -343,6 +359,15 @@
       else showPdf(pane, m, my);
     };
     buttons.forEach((b) => b.addEventListener('click', () => select(Number(b.dataset.k))));
+
+    // 소분류 고르면 목록을 거르고, 보고 있던 자료가 빠지면 첫 자료를 엶
+    body.querySelectorAll('.subfilter__btn').forEach((btn) => btn.addEventListener('click', () => {
+      const x = btn.dataset.sub;
+      body.querySelectorAll('.subfilter__btn').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+      buttons.forEach((b) => { b.hidden = Boolean(x) && b.dataset.sub !== x; });
+      const visible = buttons.filter((b) => !b.hidden);
+      if (visible.length && buttons[currentK].hidden) select(Number(visible[0].dataset.k));
+    }));
     select(0);
   }
 
