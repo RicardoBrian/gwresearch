@@ -59,6 +59,9 @@ def read_rows():
         print(f"파일 읽는 중: {path.relative_to(ROOT)}")
         text = path.read_text(encoding="utf-8-sig")
     reader = csv.DictReader(io.StringIO(text))
+    # 첫 칸을 'ID' 로 쓴 시트도 받아줌
+    if reader.fieldnames and "항목ID" not in reader.fieldnames and "ID" in reader.fieldnames:
+        reader.fieldnames = ["항목ID" if f == "ID" else f for f in reader.fieldnames]
     missing = [c for c in ("항목ID", "제목") if c not in (reader.fieldnames or [])]
     if missing:
         sys.exit(f"오류: 시트 첫 줄에 {', '.join(missing)} 열이 없습니다. 열 제목: {' | '.join(COLS)}")
