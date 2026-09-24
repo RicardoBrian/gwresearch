@@ -177,25 +177,34 @@
     else renderItem(route.item, my);
   }
 
-  function head({ stage, title, titleClass = '', meta = '', crumb }) {
+  // 머리글 한 줄: [단계 › 제목 · 자료 수]  ……  [이전][다음][닫기]
+  // (세로 공간을 문서에 최대한 주기 위해 이전/다음도 머리글에 둠)
+  function head({ stage, title, titleClass = '', meta = '', crumb, prev, next }) {
+    const navBtn = (t, dir) => {
+      const label = dir === 'prev' ? '이전' : '다음';
+      if (!t) return `<span class="hbtn is-disabled" aria-hidden="true">${ICON[dir]}</span>`;
+      const name = t.title || t.name;
+      return `
+        <a class="hbtn hbtn--${dir}" href="#${esc(t.id)}" data-replace
+           aria-label="${label}: ${esc(name)}" data-tip="${label} · ${esc(name)}">
+          ${ICON[dir]}
+        </a>`;
+    };
     return `
       <header class="viewer__head">
-        <div class="viewer__crumb">${crumb}</div>
-        <h2 class="viewer__title ${titleClass}" id="viewer-title" tabindex="-1">${esc(title)}</h2>
-        <p class="viewer__meta">${esc(meta)}</p>
+        <div class="viewer__heading">
+          <div class="viewer__crumb">${crumb}</div>
+          <div class="viewer__titleline">
+            <h2 class="viewer__title ${titleClass}" id="viewer-title" tabindex="-1">${esc(title)}</h2>
+            <p class="viewer__meta">${esc(meta)}</p>
+          </div>
+        </div>
         <img class="viewer__art" src="${esc(stage.art)}" alt="">
-        <button class="viewer__close" type="button" aria-label="닫기">${ICON.close}</button>
+        <div class="viewer__actions">
+          <nav class="viewer__pager" aria-label="이전·다음">${navBtn(prev, 'prev')}${navBtn(next, 'next')}</nav>
+          <button class="hbtn viewer__close" type="button" aria-label="닫기">${ICON.close}</button>
+        </div>
       </header>`;
-  }
-
-  function nav(prev, next) {
-    const link = (t, dir) => (t ? `
-      <a class="viewer__nav viewer__nav--${dir}" href="#${esc(t.id)}" data-replace>
-        ${dir === 'prev' ? ICON.prev : ''}
-        <span><small>${dir === 'prev' ? '이전' : '다음'}${t.stage ? ` · ${esc(t.stage.name)}` : ''}</small>${esc(t.title || t.name)}</span>
-        ${dir === 'next' ? ICON.next : ''}
-      </a>` : '<span></span>');
-    return `<footer class="viewer__foot">${link(prev, 'prev')}${link(next, 'next')}</footer>`;
   }
 
   function mount(html) {
@@ -225,11 +234,12 @@
         titleClass: 'is-display',
         meta: `${stage.items.length}개 항목`,
         crumb: `<span class="badge">${stage.n}</span><span>학생 성장 지원 로드맵 · ${stage.n}단계</span>`,
+        prev: stages[i - 1],
+        next: stages[i + 1],
       })}
       <div class="viewer__body viewer__body--stage">
         <ul class="cards">${cards}</ul>
-      </div>
-      ${nav(stages[i - 1], stages[i + 1])}`);
+      </div>`);
   }
 
   // ---- 항목 자료 ----
@@ -240,9 +250,8 @@
 
     // 목록을 기다리는 동안 머리글부터 보여줌
     mount(`
-      ${head({ stage, title: item.title, crumb, meta: ' ' })}
-      <div class="viewer__body"><div class="state"><span class="spinner"></span></div></div>
-      ${nav(items[i - 1], items[i + 1])}`);
+      ${head({ stage, title: item.title, crumb, meta: ' ', prev: items[i - 1], next: items[i + 1] })}
+      <div class="viewer__body"><div class="state"><span class="spinner"></span></div></div>`);
     await dataReady;
     if (my !== token) return;
 
@@ -343,18 +352,20 @@
       <div class="pdf">
         <div class="pdf__bar">
           <div class="pdf__name">
-            <h3 class="pane__title">${esc(m.title)}</h3>
-            <span class="pdf__page" aria-live="off"><b>–</b> / <span>–</span></span>
+            <div class="pdf__nameline">
+              <h3 class="pane__title">${esc(m.title)}</h3>
+              <span class="pdf__page" aria-live="off"><b>–</b> / <span>–</span></span>
+            </div>
+            ${m.desc ? `<p class="pdf__desc" title="${esc(m.desc)}">${esc(m.desc)}</p>` : ''}
           </div>
           <div class="pdf__tools">
             <button class="icon-btn" type="button" data-zoom="-1" aria-label="축소">${ICON.minus}</button>
-            <button class="pdf__zoom" type="button" data-zoom="0" title="폭에 맞추기">100%</button>
+            <button class="pdf__zoom" type="button" data-zoom="0" title="화면에 맞추기">맞춤</button>
             <button class="icon-btn" type="button" data-zoom="1" aria-label="확대">${ICON.plus}</button>
             <a class="icon-btn" href="${esc(file)}" target="_blank" rel="noopener" aria-label="새 창에서 열기" title="새 창에서 열기">${ICON.external}</a>
             <a class="btn btn--solid" href="${esc(file)}" download>${ICON.download}<span>내려받기</span></a>
           </div>
         </div>
-        ${m.desc ? `<p class="pane__desc pdf__desc">${esc(m.desc)}</p>` : ''}
         <div class="pdf__scroll" tabindex="0" aria-label="${esc(m.title)} 미리보기">
           <div class="pdf__pages"><div class="pdf__sheet is-skeleton"></div></div>
         </div>
@@ -434,9 +445,18 @@
     relayout();
     ro.observe(scroller);
 
+    // 기본 크기(“맞춤”)
+    // - 가로 문서(발표자료): 한 쪽 전체가 화면 안에 들어오게
+    // - 세로 문서(보고서): 폭에 맞춤 (읽기 편한 최대 900px)
     function baseWidth() {
-      const pad = scroller.clientWidth < 600 ? 24 : 64;
-      return Math.max(200, Math.min(scroller.clientWidth - pad, 900));
+      const pad = scroller.clientWidth < 600 ? 16 : 40;
+      const fitWidth = Math.min(scroller.clientWidth - pad, 900);
+      const first = pages[0];
+      if (first && first.w > first.h) {
+        const fitPage = (scroller.clientHeight - pad) * (first.w / first.h);
+        return Math.max(200, Math.min(fitWidth, fitPage));
+      }
+      return Math.max(200, fitWidth);
     }
 
     function relayout() {
@@ -445,7 +465,7 @@
       const w = baseWidth() * zoom;
       pages.forEach((p) => { p.el.style.width = `${w}px`; });
       scroller.scrollTop = ratio * scroller.scrollHeight;
-      zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+      zoomLabel.textContent = zoom === 1 ? '맞춤' : `${Math.round(zoom * 100)}%`;
       // 이미 보이는 쪽도 다시 알림 받도록 재등록
       pages.forEach((p) => { io.unobserve(p.el); io.observe(p.el); });
     }
