@@ -127,6 +127,9 @@ def main():
                 continue
             m.update(type="video", youtube=vid)
         else:
+            if "drive.google.com/drive/folders" in f:
+                errors.append(f"{where}: 폴더 링크입니다. 폴더 안의 PDF 파일을 열어서 그 파일의 링크를 붙여 주세요.")
+                continue
             if drive_id(f):
                 path = fetch_drive(drive_id(f), errors, where)
                 if not path:
