@@ -168,31 +168,6 @@ a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transpar
 .stage__link,
 .item { cursor: pointer; }
 
-/* 준비 중 안내 토스트 */
-.toast {
-  position: fixed;
-  left: 50%;
-  bottom: 32px;
-  z-index: 10;
-  max-width: calc(100% - 32px);
-  padding: 14px 22px;
-  border-radius: 999px;
-  background: rgba(24, 32, 18, .92);
-  color: #fff;
-  font-size: 15px;
-  font-weight: 500;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .18);
-  opacity: 0;
-  pointer-events: none;
-  transform: translate(-50%, 12px);
-  transition: opacity .25s, transform .35s var(--ease);
-}
-
-.toast.is-visible {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-
 /* =========================================================
    데스크톱: 시안 구도
    ========================================================= */
