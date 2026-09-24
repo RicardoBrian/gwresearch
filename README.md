@@ -38,14 +38,46 @@ npm i @noonnu/gosanja && pip install fonttools brotli
 python3 tools/subset_font.py node_modules/@noonnu/gosanja/fonts/gosanja-normal.woff
 ```
 
-## 자료 넣는 규칙
+## 자료 넣는 법
 
-- 문서는 모두 **PDF**, 영상은 **YouTube**(일부공개) 주소만
-- `assets/data.json`의 한 항목 = 자료 하나
+자료 목록은 **구글 시트 한 장**으로 관리합니다. 한 줄이 자료 하나입니다.
 
-```json
-{ "item": "bilingual-education", "type": "pdf",   "title": "운영 보고서", "file": "assets/docs/…pdf", "desc": "설명(선택)" }
-{ "item": "bilingual-education", "type": "video", "title": "수업 영상",   "youtube": "https://www.youtube.com/watch?v=…" }
-```
+| 항목ID | 분류 | 제목 | 파일 | 유튜브 | 설명 |
+|---|---|---|---|---|---|
+| kls-prerequisite | 국어 | 1학기 수업계획 | kls/국어-수업계획.pdf | | |
+| kls-prerequisite | 국어 | 수업 영상 | | https://youtu.be/… | |
+| kls-prerequisite | | 운영 개요 | kls/운영개요.pdf | | 분류를 비우면 ‘공통’ |
 
-`item`은 `index.html` 항목 링크(`href="#…"`)와 같아야 합니다. 자료가 없는 항목은 “자료 준비 중”으로 표시됩니다.
+- **항목ID**: 아래 표에서 복사해서 붙여 넣기 (필수)
+- **분류**: 선택. 한 항목 안에 분류가 하나라도 있으면, 항목을 눌렀을 때 분류 카드가 먼저 나옵니다
+- **파일**: PDF만. `assets/docs/` 아래 경로, 또는 구글 드라이브 공유 링크(‘링크가 있는 모든 사용자’ 공유 필요)
+- **유튜브**: 영상 주소 (일부공개 권장). 파일과 유튜브 중 **하나만**
+- 순서: 시트에 적은 순서대로 보입니다
+
+시트 → 사이트 반영: `python3 tools/build_data.py`
+(시트를 CSV로 내려받아 `data/materials.csv`에 두거나, 환경변수 `SHEET_CSV_URL`에 ‘웹에 게시’ CSV 주소를 넣음)
+항목ID 오타, 없는 파일, PDF가 아닌 파일, 25MB 초과 등이 있으면 행 번호와 함께 알려주고 멈춥니다.
+
+### 항목ID 표
+
+| 단계 | 항목 | 항목ID |
+|---|---|---|
+| 1 초기 적응 지원 | KLS 기초 한국어 선이수제 | `kls-prerequisite` |
+| 1 초기 적응 지원 | 선이수제 학생 추수지도 | `prerequisite-followup` |
+| 1 초기 적응 지원 | 생활적응교육 | `life-adaptation` |
+| 2 학생 진단 | 언어권별 기초학력 진단 | `language-diagnosis` |
+| 2 학생 진단 | 학생별 지원 필요 영역 확인 및 관리 | `needs-management` |
+| 3 학습 지원 | 특별학급 운영 | `special-class` |
+| 3 학습 지원 | 개별수업 운영 | `individual-class` |
+| 3 학습 지원 | 이중언어 교육 | `bilingual-education` |
+| 3 학습 지원 | 교과 이해 지원 | `subject-support` |
+| 3 학습 지원 | 기초학력 향상 지원 | `basic-skills` |
+| 4 정서 지원 | 상호문화교육 | `intercultural-education` |
+| 4 정서 지원 | 어울림 집단 상담 | `group-counseling` |
+| 4 정서 지원 | 예체능교육 | `arts-sports` |
+| 4 정서 지원 | 또래멘토링 | `peer-mentoring` |
+| 5 미래 인재 양성 | 세계 각국 학생 대사 | `student-ambassadors` |
+| 5 미래 인재 양성 | 이중언어 말하기 대회 | `bilingual-speech` |
+| 5 미래 인재 양성 | 유네스코 세계시민교육 | `unesco-gced` |
+| 5 미래 인재 양성 | 글로컬 문제해결 프로젝트 | `glocal-project` |
+

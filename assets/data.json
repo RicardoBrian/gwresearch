@@ -1,41 +1,40 @@
 {
   "updated": "2026-09-24",
-  "note": "견본 데이터입니다. 나중에 구글 시트에서 자동으로 만들어집니다. item 은 index.html 항목 링크(#...)와 같아야 합니다.",
   "materials": [
     {
       "item": "bilingual-education",
-      "type": "pdf",
       "title": "이중언어 교육 운영 보고서",
+      "type": "pdf",
       "file": "assets/docs/sample/report.pdf",
       "desc": "견본 자료입니다. 한 해 동안의 운영 계획과 결과를 정리한 보고서 형식입니다."
     },
     {
       "item": "bilingual-education",
-      "type": "video",
       "title": "수업 영상",
-      "youtube": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
-      "desc": "견본 영상입니다. 실제 자료에서는 수업 장면 영상이 들어갑니다."
+      "type": "video",
+      "youtube": "aqz-KE-bpKQ",
+      "desc": "견본 영상입니다."
     },
     {
       "item": "bilingual-education",
-      "type": "pdf",
       "title": "발표자료",
+      "type": "pdf",
       "file": "assets/docs/sample/slides.pdf",
       "desc": "견본 자료입니다. 가로형 발표자료(PPT를 PDF로 저장)입니다."
     },
     {
       "item": "kls-prerequisite",
-      "type": "pdf",
       "title": "KLS 기초 한국어 선이수제 발표자료",
+      "type": "pdf",
       "file": "assets/docs/sample/slides.pdf",
       "desc": "견본 자료입니다."
     },
     {
       "item": "peer-mentoring",
-      "type": "video",
       "title": "또래멘토링 활동 영상",
+      "type": "video",
       "youtube": "aqz-KE-bpKQ",
-      "desc": "견본 영상입니다. 자료가 영상 하나뿐인 경우를 확인합니다."
+      "desc": "견본 영상입니다."
     }
   ]
 }

@@ -130,6 +130,26 @@ html.has-modal { overflow: hidden; }
 }
 
 .viewer__back:hover { background: rgba(69, 109, 42, .1); }
+
+/* 분류 화면: 단계 › 항목 */
+.viewer__crumb { min-width: 0; }
+.viewer__sep { flex: none; color: var(--muted); }
+
+.viewer__crumbitem {
+  min-width: 0;
+  overflow: hidden;
+  padding: 2px 8px;
+  margin-left: -6px;
+  border-radius: 999px;
+  color: var(--green-dark);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background-color .2s;
+}
+
+.viewer__crumbitem:hover { background: rgba(69, 109, 42, .1); }
 .viewer__back:hover::before { transform: translateX(-3px); }
 
 .viewer__titleline {

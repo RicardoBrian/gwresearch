@@ -67,6 +67,25 @@
     }
   }
 
+  // ---- 분류 (시트의 "분류" 칸) ----
+  // 분류가 하나라도 있으면: 항목 → 분류 카드 → 분류별 자료
+  // 분류 칸이 빈 자료는 "공통"으로 묶음
+  const COMMON = '공통';
+  const hasGroups = (list) => list.some((m) => (m.group || '').trim());
+
+  function groupsOf(list) {
+    const out = [];
+    for (const m of list) {
+      const name = (m.group || '').trim() || COMMON;
+      let g = out.find((x) => x.name === name);
+      if (!g) out.push(g = { name, list: [] });
+      g.list.push(m);
+    }
+    return out;
+  }
+
+  const groupPath = (item, name) => `${item.id}/${encodeURIComponent(name)}`;
+
   function summary(list) {
     if (!list.length) return '자료 준비 중';
     const pdf = list.filter((m) => m.type === 'pdf').length;
@@ -87,19 +106,24 @@
   };
 
   // ---- 주소(해시) ↔ 창 ----
+  // #stage-N, #항목id, #항목id/분류
   function routeOf(hash) {
-    const id = decodeURIComponent(hash.replace(/^#/, ''));
-    if (stageById.has(id)) return { kind: 'stage', stage: stageById.get(id), key: id };
-    if (itemById.has(id)) return { kind: 'item', item: itemById.get(id), key: id };
+    const raw = hash.replace(/^#/, '');
+    const [id, g] = raw.split('/');
+    const group = g ? decodeURIComponent(g) : null;
+    if (!group && stageById.has(id)) return { kind: 'stage', stage: stageById.get(id), path: id };
+    if (itemById.has(id)) {
+      return { kind: 'item', item: itemById.get(id), group, path: group ? groupPath(itemById.get(id), group) : id };
+    }
     return null;
   }
 
   // 창 안에서 몇 번 이동했는지 기억 → 닫을 때 그만큼 뒤로 가서 로드맵 주소로 복귀
   const depth = () => (history.state && history.state.viewerDepth) || 0;
 
-  function go(id, replace) {
+  function go(path, replace) {
     const d = replace ? depth() : depth() + 1;
-    history[replace ? 'replaceState' : 'pushState']({ viewerDepth: d }, '', `#${id}`);
+    history[replace ? 'replaceState' : 'pushState']({ viewerDepth: d }, '', `#${path}`);
     render();
   }
 
@@ -119,7 +143,7 @@
     const route = routeOf(a.getAttribute('href'));
     if (!route) return;
     e.preventDefault();
-    go(route.key, a.hasAttribute('data-replace'));
+    go(route.path, a.hasAttribute('data-replace'));
   });
 
   window.addEventListener('popstate', render);
@@ -166,15 +190,15 @@
   async function render() {
     const route = routeOf(location.hash);
     if (!route) return closeDialog();
-    if (route.key === shownKey && dialog.open) return;
-    shownKey = route.key;
+    if (route.path === shownKey && dialog.open) return;
+    shownKey = route.path;
     cleanup();
     cleanup = () => {};
     const my = ++token;
 
     openDialog();
     if (route.kind === 'stage') renderStage(route.stage);
-    else renderItem(route.item, my);
+    else renderItem(route.item, route.group, my);
   }
 
   // 머리글 한 줄: [단계 › 제목 · 자료 수]  ……  [이전][다음][닫기]
@@ -185,7 +209,7 @@
       if (!t) return `<span class="hbtn is-disabled" aria-hidden="true">${ICON[dir]}</span>`;
       const name = t.title || t.name;
       return `
-        <a class="hbtn hbtn--${dir}" href="#${esc(t.id)}" data-replace
+        <a class="hbtn hbtn--${dir}" href="#${esc(t.path || t.id)}" data-replace
            aria-label="${label}: ${esc(name)}" data-tip="${label} · ${esc(name)}">
           ${ICON[dir]}
         </a>`;
@@ -220,10 +244,15 @@
     const i = stages.indexOf(stage);
     const cards = stage.items.map((it) => {
       const list = materials.get(it.id) || [];
+      let meta = summary(list);
+      if (hasGroups(list)) {
+        const names = groupsOf(list).map((g) => g.name);
+        meta = names.slice(0, 3).join(' · ') + (names.length > 3 ? ` 외 ${names.length - 3}` : '');
+      }
       return `
         <li><a class="card" href="#${esc(it.id)}">
           <span class="card__title">${esc(it.title)}</span>
-          <span class="card__meta${list.length ? '' : ' is-empty'}">${esc(summary(list))}</span>
+          <span class="card__meta${list.length ? '' : ' is-empty'}">${esc(meta)}</span>
           <span class="card__arrow">${ICON.next}</span>
         </a></li>`;
     }).join('');
@@ -243,20 +272,42 @@
   }
 
   // ---- 항목 자료 ----
-  async function renderItem(item, my) {
+  async function renderItem(item, group, my) {
     const stage = item.stage;
     const i = items.indexOf(item);
-    const crumb = `<a class="viewer__back" href="#${stage.id}" data-replace><span class="badge">${stage.n}</span><span>${esc(stage.name)}</span></a>`;
+    const stageLink = `<a class="viewer__back" href="#${stage.id}" data-replace><span class="badge">${stage.n}</span><span>${esc(stage.name)}</span></a>`;
 
-    // 목록을 기다리는 동안 머리글부터 보여줌
-    mount(`
-      ${head({ stage, title: item.title, crumb, meta: ' ', prev: items[i - 1], next: items[i + 1] })}
-      <div class="viewer__body"><div class="state"><span class="spinner"></span></div></div>`);
     await dataReady;
     if (my !== token) return;
 
-    const list = materials.get(item.id) || [];
-    dialog.querySelector('.viewer__meta').textContent = loadFailed ? '' : summary(list);
+    const all = materials.get(item.id) || [];
+    const groups = hasGroups(all) ? groupsOf(all) : [];
+    const current = group ? groups.find((g) => g.name === group) : null;
+
+    // 분류가 있는 항목인데 분류를 아직 안 골랐으면 → 분류 카드
+    if (groups.length && !current) {
+      renderGroups(item, groups, all, stageLink);
+      return;
+    }
+
+    // 이전/다음: 같은 항목의 분류끼리 먼저, 끝나면 옆 항목으로
+    let prev = items[i - 1];
+    let next = items[i + 1];
+    if (current) {
+      const k = groups.indexOf(current);
+      const target = (g) => ({ path: groupPath(item, g.name), title: `${item.title} · ${g.name}` });
+      if (k > 0) prev = target(groups[k - 1]);
+      if (k < groups.length - 1) next = target(groups[k + 1]);
+    }
+
+    const list = current ? current.list : all;
+    const crumb = current
+      ? `${stageLink}<span class="viewer__sep" aria-hidden="true">›</span><a class="viewer__crumbitem" href="#${esc(item.id)}" data-replace>${esc(item.title)}</a>`
+      : stageLink;
+
+    mount(`
+      ${head({ stage, title: current ? current.name : item.title, crumb, meta: loadFailed ? '' : summary(list), prev, next })}
+      <div class="viewer__body"></div>`);
     const body = dialog.querySelector('.viewer__body');
 
     if (loadFailed) {
@@ -293,6 +344,29 @@
     };
     buttons.forEach((b) => b.addEventListener('click', () => select(Number(b.dataset.k))));
     select(0);
+  }
+
+  // ---- 분류 카드 (단계 개요와 같은 모양) ----
+  function renderGroups(item, groups, all, stageLink) {
+    const i = items.indexOf(item);
+    const cards = groups.map((g) => `
+      <li><a class="card" href="#${esc(groupPath(item, g.name))}">
+        <span class="card__title">${esc(g.name)}</span>
+        <span class="card__meta">${esc(summary(g.list))}</span>
+        <span class="card__arrow">${ICON.next}</span>
+      </a></li>`).join('');
+    mount(`
+      ${head({
+        stage: item.stage,
+        title: item.title,
+        crumb: stageLink,
+        meta: `${groups.length}개 분류 · ${summary(all)}`,
+        prev: items[i - 1],
+        next: items[i + 1],
+      })}
+      <div class="viewer__body viewer__body--stage">
+        <ul class="cards">${cards}</ul>
+      </div>`);
   }
 
   function state(title, text, stage) {
