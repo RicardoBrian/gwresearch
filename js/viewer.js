@@ -203,7 +203,7 @@
 
   // 머리글 한 줄: [단계 › 제목 · 자료 수]  ……  [이전][다음][닫기]
   // (세로 공간을 문서에 최대한 주기 위해 이전/다음도 머리글에 둠)
-  function head({ stage, title, titleClass = '', meta = '', crumb, prev, next }) {
+  function head({ stage, title, crumb, prev, next }) {
     const navBtn = (t, dir) => {
       const label = dir === 'prev' ? '이전' : '다음';
       if (!t) return `<span class="hbtn is-disabled" aria-hidden="true">${ICON[dir]}</span>`;
@@ -219,8 +219,7 @@
         <div class="viewer__heading">
           <div class="viewer__crumb">${crumb}</div>
           <div class="viewer__titleline">
-            <h2 class="viewer__title ${titleClass}" id="viewer-title" tabindex="-1">${esc(title)}</h2>
-            <p class="viewer__meta">${esc(meta)}</p>
+            <h2 class="viewer__title" id="viewer-title" tabindex="-1">${esc(title)}</h2>
           </div>
         </div>
         <img class="viewer__art" src="${esc(stage.art)}" alt="">
@@ -260,8 +259,6 @@
       ${head({
         stage,
         title: stage.name,
-        titleClass: 'is-display',
-        meta: `${stage.items.length}개 항목`,
         crumb: `<span class="badge">${stage.n}</span><span>학생 성장 지원 로드맵 · ${stage.n}단계</span>`,
         prev: stages[i - 1],
         next: stages[i + 1],
@@ -306,7 +303,7 @@
       : stageLink;
 
     mount(`
-      ${head({ stage, title: current ? current.name : item.title, crumb, meta: loadFailed ? '' : summary(list), prev, next })}
+      ${head({ stage, title: current ? current.name : item.title, crumb, prev, next })}
       <div class="viewer__body"></div>`);
     const body = dialog.querySelector('.viewer__body');
 
@@ -385,7 +382,6 @@
         stage: item.stage,
         title: item.title,
         crumb: stageLink,
-        meta: `${groups.length}개 분류 · ${summary(all)}`,
         prev: items[i - 1],
         next: items[i + 1],
       })}
