@@ -5,7 +5,7 @@
   2. data/materials.csv       — 시트를 CSV로 내려받아 저장소에 올린 파일
 
 시트 열 (첫 줄 제목 그대로):
-  항목 | 분류 | 소분류 | 제목 | 파일 | 유튜브 | 설명
+  항목 | 분류 | 제목 | 파일 | 유튜브 | 설명   (소분류 열은 필요할 때만 추가)
   - 항목   : 로드맵 항목 이름 그대로 (예: KLS 기초 한국어 선이수제). 필수
              (열 제목을 '항목ID'/'ID'로 하고 영문 ID를 적어도 됨)
   - 분류   : 비우면 분류 없음. 채우면 항목 안에서 분류 카드로 묶임
@@ -128,13 +128,17 @@ def main():
         if not item:
             errors.append(f"{where}: 항목 '{raw_item}'이(가) 로드맵에 없습니다. 드롭다운에서 골라 주세요.")
             continue
-        if not row.get("title"):
-            errors.append(f"{where}: 제목이 비어 있습니다.")
+        f, yt = row.get("file", ""), row.get("youtube", "")
+        if not f and not yt:
+            # 아직 입력 중인 줄: 배포를 막지 않고 건너뜀
+            warnings.append(f"{where}: 파일·유튜브가 비어 있어 이번 반영에서 뺐습니다.")
+            continue
+        if f and yt:
+            errors.append(f"{where}: '파일'과 '유튜브' 중 하나만 적어 주세요.")
             continue
 
-        f, yt = row.get("file", ""), row.get("youtube", "")
-        if bool(f) == bool(yt):
-            errors.append(f"{where}: '파일'과 '유튜브' 중 하나만 적어 주세요.")
+        if not row.get("title"):
+            errors.append(f"{where}: 제목이 비어 있습니다.")
             continue
 
         m = {"item": item, "title": row["title"]}
