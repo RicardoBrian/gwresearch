@@ -130,7 +130,8 @@ def list_folder(fid, errors, warnings, where):
         errors.append(f"{where}: 드라이브 폴더를 읽지 못했습니다 ({e}). 폴더 공유가 "
                       "'링크가 있는 모든 사용자'인지 확인해 주세요.")
         return None
-    entries = re.findall(r'id="entry-([\w-]+)".*?class="flip-entry-title">([^<]*)<', html, re.S)
+    # 항목마다 (id, 링크, 이름). 하위 폴더는 링크가 /folders/ 라서 뺌
+    entries = re.findall(r'id="entry-([\w-]+)".*?href="([^"]*)".*?class="flip-entry-title">([^<]*)<', html, re.S)
     if not entries:
         if "flip-entry" not in html and "folder-contents" not in html:
             errors.append(f"{where}: 드라이브 폴더를 열 수 없습니다. 폴더 공유를 "
@@ -138,17 +139,20 @@ def list_folder(fid, errors, warnings, where):
         else:
             warnings.append(f"{where}: 폴더가 비어 있습니다.")
         return None
-    pdfs, others = [], []
-    for eid, name in entries:
+    files, folders = [], []
+    for eid, href, name in entries:
         name = html_unescape(name).strip()
-        (pdfs if name.lower().endswith(".pdf") else others).append((eid, name))
-    if others:
-        warnings.append(f"{where}: 폴더 안 PDF가 아닌 파일·하위 폴더는 뺐습니다: {', '.join(n for _, n in others)}")
-    return sorted(pdfs, key=lambda x: natural_key(x[1]))
+        (folders if "/folders/" in href else files).append((eid, name))
+    if folders:
+        warnings.append(f"{where}: 하위 폴더는 읽지 않습니다: {', '.join(n for _, n in folders)}")
+    # 파일 이름이 .pdf 로 끝나지 않아도(예: '…pdf의 사본') 내려받아서 PDF 인지 확인
+    return sorted(files, key=lambda x: natural_key(x[1]))
 
 
 def clean_title(name):
-    """파일 이름 → 제목: 확장자와 순서용 앞번호(01_, 1. , 02- 등)를 뗌"""
+    """파일 이름 → 제목: 확장자, 드라이브 사본 표시, 순서용 앞번호(01_, 1. , 02- 등)를 뗌"""
+    name = re.sub(r"\s*의 사본$", "", name.strip())
+    name = re.sub(r"^(?:Copy of|사본)\s+", "", name)
     name = re.sub(r"\.pdf$", "", name, flags=re.I)
     return re.sub(r"^\d+\s*[._\-)]\s*", "", name).strip() or name
 
@@ -171,9 +175,10 @@ def filename_of(headers):
 
 
 _drive_cache = {}
+_soft_skipped = []
 
 
-def fetch_drive(fid, errors, where):
+def fetch_drive(fid, errors, where, soft=False):
     """드라이브 PDF 를 내려받아 (사이트 경로, 파일 이름) 반환. 실패하면 errors 에 추가하고 None."""
     if fid in _drive_cache:
         return _drive_cache[fid]
@@ -187,6 +192,9 @@ def fetch_drive(fid, errors, where):
         errors.append(f"{where}: 드라이브 파일을 내려받지 못했습니다 ({e}). 파일이 지워졌는지 확인해 주세요.")
         return None
     if not data.startswith(b"%PDF"):
+        if soft:  # 폴더 안의 PDF 가 아닌 파일(사진·한글 등)은 빼고 알리기만
+            _soft_skipped.append(f"{where}: PDF가 아니어서 뺐습니다.")
+            return None
         errors.append(f"{where}: PDF를 받을 수 없습니다. 파일이 PDF인지, 공유 설정이 "
                       "'링크가 있는 모든 사용자'인지 확인해 주세요.")
         return None
@@ -259,7 +267,7 @@ def main():
                 # 폴더 링크: 안의 PDF 를 이름순으로 모두 가져옴 (제목 = 파일 이름)
                 files = list_folder(folder_id(f), errors, warnings, where)
                 for fid, name in files or []:
-                    got = fetch_drive(fid, errors, f"{where} {name}")
+                    got = fetch_drive(fid, errors, f"{where} '{name}'", soft=True)
                     if not got:
                         continue
                     fm = {"item": item, "type": "pdf", "file": got[0].relative_to(ROOT).as_posix(),
@@ -289,6 +297,7 @@ def main():
     if empty:
         warnings.append(f"자료 없는 항목 {len(empty)}개 (‘자료 준비 중’으로 표시): {', '.join(empty)}")
 
+    warnings.extend(_soft_skipped)
     for w in warnings:
         print("참고:", w)
     if errors:
