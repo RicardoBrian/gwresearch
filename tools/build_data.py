@@ -105,6 +105,7 @@ def read_rows():
 
 def col_key(h):
     """열 제목 → 내부 이름. 공백·줄바꿈·특수 공백·대소문자 차이는 무시"""
+    h = re.sub(r"[(\[（].*?[)\]）]", "", h)  # '제목(폴더 업로드시 생략)' 같은 괄호 설명은 무시
     h = re.sub(r"\s+", "", h.replace("\u00a0", " ")).lower()
     if h in NORM_COLS:
         return NORM_COLS[h]
@@ -202,6 +203,22 @@ def filename_of(headers):
 _probe_cache = {}
 
 
+def drive_page_title(fid):
+    """드라이브 파일 페이지 <title> 에서 파일 이름 (큰 파일은 다운로드 응답에 이름이 없음)"""
+    url = f"https://drive.google.com/file/d/{fid}/view"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30) as r:
+            html = r.read(200_000).decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001
+        return ""
+    m = re.search(r"<title>(.*?)</title>", html, re.S)
+    if not m:
+        return ""
+    name = html_unescape(m.group(1)).strip()
+    name = re.sub(r"\s*-\s*Google\s*(Drive|드라이브)\s*$", "", name, flags=re.I)
+    return "" if name.lower() in ("google drive", "google 드라이브", "") else name
+
+
 def probe_drive(fid):
     """드라이브 파일 앞부분(1KB)만 읽어 (PDF 여부, 파일 이름, 오류) 확인. 파일 전체는 받지 않음.
     실제 PDF 는 방문자가 열 때 Cloudflare 함수(functions/pdf/[id].js)가 드라이브에서 가져옴."""
@@ -212,7 +229,7 @@ def probe_drive(fid):
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             head = r.read(1024)
-            result = (head.startswith(b"%PDF"), filename_of(r.headers), "")
+            result = (head.startswith(b"%PDF"), filename_of(r.headers) or drive_page_title(fid), "")
     except Exception as e:  # noqa: BLE001
         result = (False, "", str(e))
     _probe_cache[fid] = result
@@ -273,10 +290,11 @@ def main():
             title = row.get("title")
             if not title:
                 _, fname, err = probe_drive(did)
-                if err:
-                    errors.append(f"{where}: 드라이브 영상을 확인하지 못했습니다 ({err}). 공유 설정을 확인해 주세요.")
-                    continue
-                title = clean_title(fname)
+                title = clean_title(fname) if fname else ""
+                if not title:
+                    title = row.get("group") or "영상"
+                    warnings.append(f"{where}: 드라이브 영상 이름을 알 수 없어 '{title}'(으)로 표시합니다. "
+                                    "제목 칸에 적으면 그 이름으로 나옵니다." + (f" ({err})" if err else ""))
             m.update(type="video", drive=did)
         elif yt:
             vid = youtube_id(yt)
