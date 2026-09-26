@@ -12,7 +12,7 @@
   - 제목        : 선택. 비우면 드라이브 파일 이름 / 유튜브 영상 제목을 씀
   - PDF 링크    : 구글 드라이브 PDF 파일 링크, 또는 폴더 링크(안의 PDF 전부, 이름순, 제목=파일 이름)
                   공유: 링크가 있는 모든 사용자
-  - 유튜브 링크 : 영상 주소. PDF 링크와 둘 중 하나만
+  - 유튜브 링크 : 영상 주소 (유튜브 또는 드라이브 영상 파일 링크). PDF 링크와 둘 중 하나만
   - 설명        : 선택
   (고급) '소분류' 열을 추가하면 같은 분류 안에서 칩 버튼으로 걸러 봄
 
@@ -173,7 +173,7 @@ def clean_title(name):
     """파일 이름 → 제목: 확장자, 드라이브 사본 표시, 순서용 앞번호(01_, 1. , 02- 등)를 뗌"""
     name = re.sub(r"\s*의 사본$", "", name.strip())
     name = re.sub(r"^(?:Copy of|사본)\s+", "", name)
-    name = re.sub(r"\.pdf$", "", name, flags=re.I)
+    name = re.sub(r"\.(pdf|mp4|mov|m4v|avi|wmv|mkv|webm)$", "", name, flags=re.I)
     return re.sub(r"^\d+\s*[._\-)]\s*", "", name).strip() or name
 
 
@@ -267,10 +267,21 @@ def main():
             continue
 
         m = {"item": item}
-        if yt:
+        if yt and drive_id(yt):
+            # 드라이브 영상: 드라이브 재생기로 틀어줌. 제목이 없으면 파일 이름
+            did = drive_id(yt)
+            title = row.get("title")
+            if not title:
+                _, fname, err = probe_drive(did)
+                if err:
+                    errors.append(f"{where}: 드라이브 영상을 확인하지 못했습니다 ({err}). 공유 설정을 확인해 주세요.")
+                    continue
+                title = clean_title(fname)
+            m.update(type="video", drive=did)
+        elif yt:
             vid = youtube_id(yt)
             if not vid:
-                errors.append(f"{where}: 유튜브 주소를 알아볼 수 없습니다: {yt}")
+                errors.append(f"{where}: 영상 주소를 알아볼 수 없습니다 (유튜브 또는 드라이브 파일 링크): {yt}")
                 continue
             title = row.get("title") or youtube_title(vid)
             m.update(type="video", youtube=vid)

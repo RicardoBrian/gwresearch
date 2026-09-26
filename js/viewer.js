@@ -389,6 +389,7 @@
 
   // ---- 영상 ----
   function showVideo(pane, m) {
+    if (m.drive) return showDriveVideo(pane, m);
     const id = youtubeId(m.youtube);
     if (!id) {
       pane.innerHTML = '<div class="state"><p class="state__title">영상 주소가 올바르지 않습니다.</p></div>';
@@ -417,6 +418,23 @@
       iframe.allowFullscreen = true;
       e.currentTarget.replaceWith(iframe);
     }, { once: true });
+  }
+
+  // 드라이브 영상: 드라이브 재생기 (파일 공유가 '링크가 있는 모든 사용자'여야 함)
+  function showDriveVideo(pane, m) {
+    const id = encodeURIComponent(m.drive);
+    pane.innerHTML = `
+      <div class="video-wrap">
+        <div class="video">
+          <iframe src="https://drive.google.com/file/d/${id}/preview" title="${esc(m.title)}"
+            allow="autoplay; fullscreen" allowfullscreen loading="lazy"></iframe>
+        </div>
+        <div class="video__info">
+          <h3 class="pane__title">${esc(m.title)}</h3>
+          ${m.desc ? `<p class="pane__desc">${esc(m.desc)}</p>` : ''}
+          <a class="btn" href="https://drive.google.com/file/d/${id}/view" target="_blank" rel="noopener">${ICON.external}드라이브에서 보기</a>
+        </div>
+      </div>`;
   }
 
   // ---- PDF ----
