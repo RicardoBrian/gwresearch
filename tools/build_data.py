@@ -50,6 +50,9 @@ COLS = {
     "유튜브 링크": "youtube", "유튜브": "youtube",
     "설명": "desc",
 }
+NORM_COLS = {re.sub(r"\s+", "", k).lower(): v for k, v in COLS.items()}
+KEY_NAMES = {"stage": "단계", "item": "항목", "group": "분류", "sub": "소분류", "title": "제목",
+             "file": "PDF 링크", "youtube": "유튜브 링크", "desc": "설명"}
 UA = {"User-Agent": "Mozilla/5.0 (gwresearch build)"}
 
 
@@ -86,14 +89,30 @@ def read_rows():
         text = path.read_text(encoding="utf-8-sig")
 
     reader = csv.reader(io.StringIO(text))
-    header = [COLS.get(h.strip(), "") for h in next(reader, [])]
+    raw_header = next(reader, [])
+    header = [col_key(h) for h in raw_header]
+    print("열 인식: " + ", ".join(f"{h.strip() or '(빈 칸)'}→{KEY_NAMES.get(k, '무시')}" for h, k in zip(raw_header, header)))
     if "item" not in header:
-        sys.exit("오류: 시트 1행에 '항목' 열이 없습니다. "
+        sys.exit("오류: 시트 1행에서 '항목' 열을 찾지 못했습니다. "
                  "열 제목: 단계 | 항목 | 분류 | 제목 | PDF 링크 | 유튜브 링크 | 설명")
+    if "file" not in header and "youtube" not in header:
+        sys.exit("오류: 시트 1행에서 'PDF 링크'·'유튜브 링크' 열을 찾지 못했습니다. 열 제목을 확인해 주세요.")
     rows = []
     for values in reader:
         rows.append({k: v.strip() for k, v in zip(header, values) if k})
     return rows
+
+
+def col_key(h):
+    """열 제목 → 내부 이름. 공백·줄바꿈·특수 공백·대소문자 차이는 무시"""
+    h = re.sub(r"\s+", "", h.replace("\u00a0", " ")).lower()
+    if h in NORM_COLS:
+        return NORM_COLS[h]
+    if "pdf" in h or h in ("파일", "파일링크", "링크"):
+        return "file"
+    if "유튜브" in h or "youtube" in h or "영상" in h:
+        return "youtube"
+    return ""
 
 
 def youtube_id(v):
