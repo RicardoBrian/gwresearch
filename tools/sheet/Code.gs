@@ -19,7 +19,7 @@ function deploySite() {
     ui.alert('배포를 시작했습니다. 2~3분 뒤 사이트를 확인해 주세요.\n'
       + '방금 고친 내용이 안 보이면 5분 뒤 한 번 더 눌러 주세요.');
   } else {
-    ui.alert('배포 요청 실패 (' + res.getResponseCode() + '). 배포 훅 주소를 확인해 주세요.');
+    ui.alert('배포 요청 실패 (' + res.getResponseCode() + ')\n' + res.getContentText().slice(0, 500));
   }
 }
 
