@@ -191,6 +191,11 @@ def filename_of(headers):
     else:
         m = re.search(r'filename="?([^";]+)"?', cd)
         name = m.group(1) if m else ""
+        # 드라이브는 한글 이름을 UTF-8 그대로 보내는데 파이썬은 latin-1 로 읽음 → 되돌림
+        try:
+            name = name.encode("latin-1").decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            pass
     return re.sub(r"\.pdf$", "", name, flags=re.I).strip()
 
 
