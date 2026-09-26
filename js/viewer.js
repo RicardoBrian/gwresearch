@@ -99,7 +99,6 @@
     pdf: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 3v5h5M9 13h6M9 17h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     video: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 9.2v5.6l4.8-2.8z" fill="currentColor"/></svg>',
     close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
-    prev: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     next: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     minus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
     plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12M12 6v12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
@@ -203,33 +202,33 @@
     else renderItem(route.item, route.group, my);
   }
 
-  // 머리글 한 줄: [단계 › 제목 · 자료 수]  ……  [이전][다음][닫기]
-  // (세로 공간을 문서에 최대한 주기 위해 이전/다음도 머리글에 둠)
-  function head({ stage, title, crumb, prev, next }) {
-    const navBtn = (t, dir) => {
-      const label = dir === 'prev' ? '이전' : '다음';
-      if (!t) return `<span class="hbtn is-disabled" aria-hidden="true">${ICON[dir]}</span>`;
-      const name = t.title || t.name;
-      return `
-        <a class="hbtn hbtn--${dir}" href="#${esc(t.path || t.id)}" data-replace
-           aria-label="${label}: ${esc(name)}" data-tip="${label} · ${esc(name)}">
-          ${ICON[dir]}
-        </a>`;
-    };
+  // 머리글: [위치 표시 / 제목]  ……  [닫기]
+  // 단계 화면은 제목 대신 단계 탭(①~⑤)을 보여줌 — 지금 단계가 보이고 다른 단계로 바로 이동
+  function head({ stage, title, crumb, tabs = '' }) {
     return `
-      <header class="viewer__head">
+      <header class="viewer__head${tabs ? ' has-tabs' : ''}">
         <div class="viewer__heading">
           <div class="viewer__crumb">${crumb}</div>
           <div class="viewer__titleline">
-            <h2 class="viewer__title" id="viewer-title" tabindex="-1">${esc(title)}</h2>
+            <h2 class="viewer__title${tabs ? ' sr-only' : ''}" id="viewer-title" tabindex="-1">${esc(title)}</h2>
           </div>
+          ${tabs}
         </div>
         <img class="viewer__art" src="${esc(stage.art)}" alt="">
         <div class="viewer__actions">
-          <nav class="viewer__pager" aria-label="이전·다음">${navBtn(prev, 'prev')}${navBtn(next, 'next')}</nav>
           <button class="hbtn viewer__close" type="button" aria-label="닫기">${ICON.close}</button>
         </div>
       </header>`;
+  }
+
+  function stageTabs(current) {
+    return `
+      <nav class="stagetabs" aria-label="단계">
+        ${stages.map((s) => `
+          <a class="stagetab" href="#${s.id}" data-replace${s === current ? ' aria-current="page"' : ''}>
+            <span class="stagetab__num">${s.n}</span><span class="stagetab__name">${esc(s.name)}</span>
+          </a>`).join('')}
+      </nav>`;
   }
 
   function mount(html) {
@@ -242,7 +241,6 @@
   // ---- 단계 개요 ----
   async function renderStage(stage) {
     await dataReady;
-    const i = stages.indexOf(stage);
     const cards = stage.items.map((it) => {
       const list = materials.get(it.id) || [];
       let meta = summary(list);
@@ -261,19 +259,20 @@
       ${head({
         stage,
         title: stage.name,
-        crumb: `<span class="badge">${stage.n}</span><span>학생 성장 지원 로드맵 · ${stage.n}단계</span>`,
-        prev: stages[i - 1],
-        next: stages[i + 1],
+        crumb: '<span>학생 성장 지원 로드맵</span>',
+        tabs: stageTabs(stage),
       })}
       <div class="viewer__body viewer__body--stage">
         <ul class="cards">${cards}</ul>
       </div>`);
+    // 휴대폰에서 가로로 넘치면 지금 단계 탭이 보이게
+    const cur = dialog.querySelector('.stagetab[aria-current]');
+    if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'center' });
   }
 
   // ---- 항목 자료 ----
   async function renderItem(item, group, my) {
     const stage = item.stage;
-    const i = items.indexOf(item);
     const stageLink = `<a class="viewer__back" href="#${stage.id}" data-replace><span class="badge">${stage.n}</span><span>${esc(stage.name)}</span></a>`;
 
     await dataReady;
@@ -289,23 +288,13 @@
       return;
     }
 
-    // 이전/다음: 같은 항목의 분류끼리 먼저, 끝나면 옆 항목으로
-    let prev = items[i - 1];
-    let next = items[i + 1];
-    if (current) {
-      const k = groups.indexOf(current);
-      const target = (g) => ({ path: groupPath(item, g.name), title: `${item.title} · ${g.name}` });
-      if (k > 0) prev = target(groups[k - 1]);
-      if (k < groups.length - 1) next = target(groups[k + 1]);
-    }
-
     const list = current ? current.list : all;
     const crumb = current
       ? `${stageLink}<span class="viewer__sep" aria-hidden="true">›</span><a class="viewer__crumbitem" href="#${esc(item.id)}" data-replace>${esc(item.title)}</a>`
       : stageLink;
 
     mount(`
-      ${head({ stage, title: current ? current.name : item.title, crumb, prev, next })}
+      ${head({ stage, title: current ? current.name : item.title, crumb })}
       <div class="viewer__body"></div>`);
     const body = dialog.querySelector('.viewer__body');
 
@@ -372,7 +361,6 @@
 
   // ---- 분류 카드 (단계 개요와 같은 모양) ----
   function renderGroups(item, groups, all, stageLink) {
-    const i = items.indexOf(item);
     const cards = groups.map((g) => `
       <li><a class="card" href="#${esc(groupPath(item, g.name))}">
         <span class="card__title">${esc(g.name)}</span>
@@ -384,8 +372,6 @@
         stage: item.stage,
         title: item.title,
         crumb: stageLink,
-        prev: items[i - 1],
-        next: items[i + 1],
       })}
       <div class="viewer__body viewer__body--stage">
         <ul class="cards">${cards}</ul>

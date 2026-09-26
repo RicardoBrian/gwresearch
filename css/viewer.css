@@ -135,6 +135,7 @@ html.has-modal { overflow: hidden; }
 
 /* 분류 화면: 단계 › 항목 */
 .viewer__crumb { min-width: 0; }
+.viewer__heading { min-width: 0; }
 .viewer__sep { flex: none; color: var(--muted); }
 
 .viewer__crumbitem {
@@ -193,12 +194,6 @@ html.has-modal { overflow: hidden; }
   gap: 8px;
 }
 
-.viewer__pager {
-  display: flex;
-  gap: 4px;
-  padding-right: 8px;
-  border-right: 1px solid var(--line);
-}
 
 .hbtn {
   position: relative;
@@ -216,36 +211,9 @@ html.has-modal { overflow: hidden; }
 }
 
 .hbtn svg { width: 18px; height: 18px; }
-.hbtn.is-disabled { opacity: .35; box-shadow: none; cursor: default; }
 
-.hbtn--prev:hover,
-.hbtn--next:hover { background: var(--green); color: #fff; }
-.hbtn--prev:hover svg { transform: translateX(-2px); }
-.hbtn--next:hover svg { transform: translateX(2px); }
 .hbtn svg { transition: transform .25s var(--ease); }
 
-/* 이전/다음 말풍선: 어디로 가는지 미리 보여줌 */
-.hbtn[data-tip]::after {
-  content: attr(data-tip);
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 2;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: rgba(24, 32, 18, .92);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-4px);
-  transition: opacity .15s, transform .2s var(--ease);
-}
-
-.hbtn[data-tip]:hover::after,
-.hbtn[data-tip]:focus-visible::after { opacity: 1; transform: none; }
 
 .viewer__head { overflow: visible; }
 
@@ -254,6 +222,57 @@ html.has-modal { overflow: hidden; }
   color: #fff;
   transform: rotate(90deg);
 }
+
+/* ---------- 단계 탭 (단계 화면) ---------- */
+.stagetabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.stagetabs::-webkit-scrollbar { display: none; }
+
+.stagetab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  transition: background-color .2s, border-color .2s, color .2s;
+}
+
+.stagetab__num {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.stagetab:hover { border-color: var(--green); }
+
+.stagetab[aria-current="page"] {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+
+.stagetab[aria-current="page"] .stagetab__num { background: #fff; }
 
 /* ---------- 본문 ---------- */
 .viewer__body {
@@ -816,13 +835,18 @@ html.has-modal { overflow: hidden; }
   }
 
   .viewer__titleline { flex-direction: column; align-items: flex-start; gap: 0; }
+  /* 단계 탭이 옆으로 더 있다는 걸 알리는 오른쪽 흐림 */
+  .stagetabs {
+    -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
+    mask-image: linear-gradient(90deg, #000 85%, transparent);
+  }
+  .stagetab { height: 36px; font-size: 14px; }
+  .stagetab__num { width: 24px; height: 24px; font-size: 13px; }
   .viewer__title { font-size: 18px; }
   .viewer__crumb { font-size: 13px; }
   .viewer__back { font-size: 14px; }
   .viewer__actions { gap: 4px; }
-  .viewer__pager { padding-right: 4px; gap: 2px; }
   .hbtn { width: 36px; height: 36px; }
-  .hbtn[data-tip]::after { display: none; }
 
   .pdf__bar { min-height: 48px; padding: 6px 8px 6px 14px; gap: 8px; }
   .pdf__tools [data-zoom], .pdf__tools a[target] { display: none; }
