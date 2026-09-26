@@ -22,3 +22,29 @@ function deploySite() {
     ui.alert('배포 요청 실패 (' + res.getResponseCode() + '). 배포 훅 주소를 확인해 주세요.');
   }
 }
+
+/**
+ * 자료 탭: A열(단계)을 고르면 B열(항목) 드롭다운이 그 단계 항목만 보이게 함.
+ * 단계·항목은 '목록' 탭(A열 단계, B열 항목)에서 읽음.
+ */
+function onEdit(e) {
+  const sh = e.range.getSheet();
+  if (sh.getName() !== '자료' || e.range.getColumn() !== 1) return;
+  const first = Math.max(e.range.getRow(), 2);
+  const last = e.range.getLastRow();
+  if (last < first) return;
+
+  const list = e.source.getSheetByName('목록').getDataRange().getValues().slice(1);
+  const stages = sh.getRange(first, 1, last - first + 1, 1).getValues();
+  stages.forEach(([stage], k) => {
+    const cell = sh.getRange(first + k, 2);
+    if (!stage) {
+      cell.clearDataValidations();
+      return;
+    }
+    const items = list.filter((r) => r[0] === stage).map((r) => r[1]);
+    cell.setDataValidation(SpreadsheetApp.newDataValidation()
+      .requireValueInList(items, true).setAllowInvalid(false).build());
+    if (cell.getValue() && items.indexOf(cell.getValue()) < 0) cell.clearContent();
+  });
+}
