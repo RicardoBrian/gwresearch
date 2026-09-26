@@ -5,8 +5,9 @@
   2. data/materials.csv       — 시트를 CSV로 내려받아 저장소에 올린 파일
 
 시트 열 (첫 줄 제목 그대로):
-  항목ID | 분류 | 소분류 | 제목 | 파일 | 유튜브 | 설명
-  - 항목ID : 로드맵 항목 (README 표 참고). 필수
+  항목 | 분류 | 소분류 | 제목 | 파일 | 유튜브 | 설명
+  - 항목   : 로드맵 항목 이름 그대로 (예: KLS 기초 한국어 선이수제). 필수
+             (열 제목을 '항목ID'/'ID'로 하고 영문 ID를 적어도 됨)
   - 분류   : 비우면 분류 없음. 채우면 항목 안에서 분류 카드로 묶임
   - 소분류 : 선택. 같은 분류 안에서 칩 버튼(전체/1학년/2학년…)으로 걸러 봄
   - 제목   : 필수
@@ -37,9 +38,14 @@ MAX_MB = 25  # Cloudflare Pages 파일 하나당 한도
 COLS = {"항목ID": "item", "분류": "group", "소분류": "sub", "제목": "title", "파일": "file", "유튜브": "youtube", "설명": "desc"}
 
 
-def item_ids():
+def load_items():
+    """로드맵 항목: [(id, 이름)] — index.html 이 원본"""
     html = (ROOT / "index.html").read_text(encoding="utf-8")
-    return re.findall(r'class="item" href="#([^"]+)"', html)
+    return re.findall(r'class="item" href="#([^"]+)">([^<]+)<', html)
+
+
+def norm(s):
+    return re.sub(r"\s+", "", s)
 
 
 def read_rows():
@@ -60,11 +66,13 @@ def read_rows():
         text = path.read_text(encoding="utf-8-sig")
     reader = csv.DictReader(io.StringIO(text))
     # 첫 칸을 'ID' 로 쓴 시트도 받아줌
-    if reader.fieldnames and "항목ID" not in reader.fieldnames and "ID" in reader.fieldnames:
-        reader.fieldnames = ["항목ID" if f == "ID" else f for f in reader.fieldnames]
+    # 첫 열 제목은 '항목'(한글 이름) / '항목ID' / 'ID' 모두 받아줌
+    if reader.fieldnames and "항목ID" not in reader.fieldnames:
+        reader.fieldnames = ["항목ID" if f.strip() in ("항목", "ID") else f.strip() for f in reader.fieldnames]
     missing = [c for c in ("항목ID", "제목") if c not in (reader.fieldnames or [])]
     if missing:
-        sys.exit(f"오류: 시트 첫 줄에 {', '.join(missing)} 열이 없습니다. 열 제목: {' | '.join(COLS)}")
+        sys.exit(f"오류: 시트 첫 줄에 {', '.join(missing).replace('항목ID', '항목')} 열이 없습니다. "
+                 "열 제목: 항목 | 분류 | 소분류 | 제목 | 파일 | 유튜브 | 설명")
     return list(reader)
 
 
@@ -104,7 +112,9 @@ def fetch_drive(fid, errors, where):
 
 
 def main():
-    ids = item_ids()
+    pairs = load_items()
+    ids = [i for i, _ in pairs]
+    by_name = {norm(name): i for i, name in pairs}
     rows = read_rows()
     errors, warnings, out = [], [], []
 
@@ -113,9 +123,10 @@ def main():
         if not any(row.values()):
             continue
         where = f"{n}행({row.get('title') or '제목 없음'})"
-        item = row.get("item", "")
-        if item not in ids:
-            errors.append(f"{where}: 항목ID '{item}'가 로드맵에 없습니다. README의 항목ID 표를 확인해 주세요.")
+        raw_item = row.get("item", "")
+        item = raw_item if raw_item in ids else by_name.get(norm(raw_item), "")
+        if not item:
+            errors.append(f"{where}: 항목 '{raw_item}'이(가) 로드맵에 없습니다. 드롭다운에서 골라 주세요.")
             continue
         if not row.get("title"):
             errors.append(f"{where}: 제목이 비어 있습니다.")
@@ -166,7 +177,8 @@ def main():
     used = {m["item"] for m in out}
     empty = [i for i in ids if i not in used]
     if empty:
-        warnings.append(f"자료 없는 항목 {len(empty)}개 (‘자료 준비 중’으로 표시): {', '.join(empty)}")
+        names = dict(pairs)
+        warnings.append(f"자료 없는 항목 {len(empty)}개 (‘자료 준비 중’으로 표시): {', '.join(names[i] for i in empty)}")
 
     for w in warnings:
         print("참고:", w)
