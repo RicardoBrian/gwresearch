@@ -34,6 +34,8 @@
   let loadFailed = false;
   const dataReady = fetch(DATA_URL, { cache: 'no-cache' })
     .then((r) => {
+      // 로그인 시간이 끝났으면 새로 고쳐서 비밀번호 화면으로
+      if (r.status === 401) location.reload();
       if (!r.ok) throw new Error(`${r.status}`);
       return r.json();
     })

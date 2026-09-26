@@ -38,6 +38,17 @@ npm i @noonnu/gosanja && pip install fonttools brotli
 python3 tools/subset_font.py node_modules/@noonnu/gosanja/fonts/gosanja-normal.woff
 ```
 
+## 입장 비밀번호
+
+사이트 전체가 비밀번호로 잠겨 있습니다 (`functions/_middleware.js`). Cloudflare → gwresearch → 설정 → 변수 및 비밀:
+
+| 이름 | 종류 | 내용 |
+|---|---|---|
+| `SITE_PASSWORD` | 비밀(암호화) | 입장 비밀번호. **바꾸면 기존 로그인은 모두 풀림.** 없으면 사이트가 열리지 않음 |
+| `SESSION_HOURS` | 일반 텍스트 (선택) | 로그인 유지 시간(시간 단위), 기본 12 |
+
+비밀번호를 바꾼 뒤에는 한 번 다시 배포해야 적용됩니다 (시트의 [사이트 반영]).
+
 ## 자료 넣는 법
 
 자료 목록은 구글 시트 **연구학교웹앱DB**의 `자료` 탭 한 장으로 관리합니다. 한 줄이 자료 하나입니다.
@@ -57,7 +68,10 @@ python3 tools/subset_font.py node_modules/@noonnu/gosanja/fonts/gosanja-normal.w
 
 시트 메뉴 **[사이트 반영 → 지금 사이트에 반영하기]**로 배포합니다 (`tools/sheet/Code.gs`, Cloudflare 배포 훅).
 
-배포 때 `tools/build_data.py`가 시트(`SHEET_CSV_URL`)를 읽고 드라이브 PDF를 내려받아 사이트에 포함합니다.
+배포 때 `tools/build_data.py`가 시트(`SHEET_CSV_URL`)를 읽고, 드라이브 PDF는 **앞부분만 확인**합니다(PDF 여부·공유·파일 이름).
+PDF 파일 자체는 사이트에 올리지 않고, 방문자가 열 때 `functions/pdf/[id].js`가 드라이브에서 가져와 1시간 캐시합니다.
+그래서 배포가 빠르고, 드라이브에서 파일을 새 버전으로 바꾸면 재배포 없이 1시간 안에 반영됩니다.
+대신 **드라이브에서 파일을 지우거나 공유를 닫으면 사이트에서도 열리지 않습니다.**
 없는 항목, 단계·항목 불일치, PDF가 아닌 파일, 공유가 막힌 파일, 25MB 초과 등이 있으면 행 번호와 함께 알려주고 멈춥니다.
 PDF·유튜브 링크가 둘 다 빈 줄(입력 중)은 건너뜁니다.
 

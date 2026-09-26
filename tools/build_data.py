@@ -16,7 +16,8 @@
   - 설명        : 선택
   (고급) '소분류' 열을 추가하면 같은 분류 안에서 칩 버튼으로 걸러 봄
 
-드라이브 PDF 는 배포할 때 내려받아 사이트에 함께 올린다 (assets/docs/drive/).
+드라이브 PDF 는 배포 때 앞부분만 확인하고(PDF 여부·공유·파일 이름), 파일은 올리지 않는다.
+방문자가 열 때 Cloudflare 함수(functions/pdf/[id].js)가 드라이브에서 가져와 1시간 캐시한다.
 문제가 있으면 행 번호와 함께 한국어로 알려주고 실패(종료 코드 1)해서
 잘못된 내용이 배포되지 않게 한다. 파일·유튜브가 둘 다 빈 줄(입력 중)은 건너뛴다.
 
@@ -32,11 +33,11 @@ import re
 import sys
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from html import unescape as html_unescape
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DOCS = ROOT / "assets" / "docs"
-MAX_MB = 25  # Cloudflare Pages 파일 하나당 한도
 
 # 시트 열 제목 → 내부 이름 (옛 열 제목도 받아줌)
 COLS = {
@@ -174,37 +175,24 @@ def filename_of(headers):
     return re.sub(r"\.pdf$", "", name, flags=re.I).strip()
 
 
-_drive_cache = {}
-_soft_skipped = []
+_probe_cache = {}
 
 
-def fetch_drive(fid, errors, where, soft=False):
-    """드라이브 PDF 를 내려받아 (사이트 경로, 파일 이름) 반환. 실패하면 errors 에 추가하고 None."""
-    if fid in _drive_cache:
-        return _drive_cache[fid]
-    dest = DOCS / "drive" / f"{fid}.pdf"
+def probe_drive(fid):
+    """드라이브 파일 앞부분(1KB)만 읽어 (PDF 여부, 파일 이름, 오류) 확인. 파일 전체는 받지 않음.
+    실제 PDF 는 방문자가 열 때 Cloudflare 함수(functions/pdf/[id].js)가 드라이브에서 가져옴."""
+    if fid in _probe_cache:
+        return _probe_cache[fid]
     url = f"https://drive.google.com/uc?export=download&id={fid}"
+    req = urllib.request.Request(url, headers={**UA, "Range": "bytes=0-1023"})
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=90) as r:
-            data = r.read(MAX_MB * 1024 * 1024 + 1)
-            name = filename_of(r.headers)
+        with urllib.request.urlopen(req, timeout=30) as r:
+            head = r.read(1024)
+            result = (head.startswith(b"%PDF"), filename_of(r.headers), "")
     except Exception as e:  # noqa: BLE001
-        errors.append(f"{where}: 드라이브 파일을 내려받지 못했습니다 ({e}). 파일이 지워졌는지 확인해 주세요.")
-        return None
-    if not data.startswith(b"%PDF"):
-        if soft:  # 폴더 안의 PDF 가 아닌 파일(사진·한글 등)은 빼고 알리기만
-            _soft_skipped.append(f"{where}: PDF가 아니어서 뺐습니다.")
-            return None
-        errors.append(f"{where}: PDF를 받을 수 없습니다. 파일이 PDF인지, 공유 설정이 "
-                      "'링크가 있는 모든 사용자'인지 확인해 주세요.")
-        return None
-    if len(data) > MAX_MB * 1024 * 1024:
-        errors.append(f"{where}: PDF가 {MAX_MB}MB를 넘습니다. 압축해서 다시 올려 주세요.")
-        return None
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(data)
-    _drive_cache[fid] = (dest, name)
-    return _drive_cache[fid]
+        result = (False, "", str(e))
+    _probe_cache[fid] = result
+    return result
 
 
 def local_pdf(f, errors, where):
@@ -264,25 +252,38 @@ def main():
             m.update(type="video", youtube=vid)
         else:
             if folder_id(f):
-                # 폴더 링크: 안의 PDF 를 이름순으로 모두 가져옴 (제목 = 파일 이름)
-                files = list_folder(folder_id(f), errors, warnings, where)
-                for fid, name in files or []:
-                    got = fetch_drive(fid, errors, f"{where} '{name}'", soft=True)
-                    if not got:
+                # 폴더 링크: 안의 PDF 를 이름순으로 모두 (제목 = 파일 이름). 앞부분만 동시에 확인
+                files = list_folder(folder_id(f), errors, warnings, where) or []
+                with ThreadPoolExecutor(max_workers=8) as pool:
+                    probes = list(pool.map(lambda x: probe_drive(x[0]), files))
+                for (fid, name), (is_pdf, _, err) in zip(files, probes):
+                    if not is_pdf:
+                        warnings.append(f"{where} '{name}': " + (f"확인하지 못해 뺐습니다 ({err})" if err else "PDF가 아니어서 뺐습니다."))
                         continue
-                    fm = {"item": item, "type": "pdf", "file": got[0].relative_to(ROOT).as_posix(),
-                          "title": clean_title(name)}
+                    fm = {"item": item, "type": "pdf", "file": f"pdf/{fid}", "title": clean_title(name)}
                     for key in ("group", "sub"):
                         if row.get(key):
                             fm[key] = row[key]
                     out.append(fm)
                 continue
-            got = fetch_drive(drive_id(f), errors, where) if drive_id(f) else local_pdf(f, errors, where)
-            if not got:
-                continue
-            path, fname = got
-            title = row.get("title") or clean_title(fname)
-            m.update(type="pdf", file=path.relative_to(ROOT).as_posix())
+            if drive_id(f):
+                is_pdf, fname, err = probe_drive(drive_id(f))
+                if err:
+                    errors.append(f"{where}: 드라이브 파일을 확인하지 못했습니다 ({err}). 파일이 지워졌는지 확인해 주세요.")
+                    continue
+                if not is_pdf:
+                    errors.append(f"{where}: PDF를 받을 수 없습니다. 파일이 PDF인지, 공유 설정이 "
+                                  "'링크가 있는 모든 사용자'인지 확인해 주세요.")
+                    continue
+                title = row.get("title") or clean_title(fname)
+                m.update(type="pdf", file=f"pdf/{drive_id(f)}")
+            else:
+                got = local_pdf(f, errors, where)
+                if not got:
+                    continue
+                path, fname = got
+                title = row.get("title") or clean_title(fname)
+                m.update(type="pdf", file=path.relative_to(ROOT).as_posix())
 
         if not title:
             errors.append(f"{where}: 제목을 알아낼 수 없습니다. 제목 칸을 채워 주세요.")
@@ -297,7 +298,6 @@ def main():
     if empty:
         warnings.append(f"자료 없는 항목 {len(empty)}개 (‘자료 준비 중’으로 표시): {', '.join(empty)}")
 
-    warnings.extend(_soft_skipped)
     for w in warnings:
         print("참고:", w)
     if errors:
