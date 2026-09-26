@@ -10,7 +10,8 @@
   - 항목        : 로드맵 항목 이름 그대로. 필수
   - 분류        : 선택. 채우면 항목을 눌렀을 때 분류 카드(국어·수학…)가 먼저 나옴
   - 제목        : 선택. 비우면 드라이브 파일 이름 / 유튜브 영상 제목을 씀
-  - PDF 링크    : 구글 드라이브 PDF 파일 링크 (공유: 링크가 있는 모든 사용자)
+  - PDF 링크    : 구글 드라이브 PDF 파일 링크, 또는 폴더 링크(안의 PDF 전부, 이름순, 제목=파일 이름)
+                  공유: 링크가 있는 모든 사용자
   - 유튜브 링크 : 영상 주소. PDF 링크와 둘 중 하나만
   - 설명        : 선택
   (고급) '소분류' 열을 추가하면 같은 분류 안에서 칩 버튼으로 걸러 봄
@@ -31,6 +32,7 @@ import re
 import sys
 import urllib.parse
 import urllib.request
+from html import unescape as html_unescape
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DOCS = ROOT / "assets" / "docs"
@@ -107,6 +109,48 @@ def youtube_title(vid):
             return json.loads(r.read().decode("utf-8")).get("title", "")
     except Exception:  # noqa: BLE001  (비공개 영상이거나 접속 실패)
         return ""
+
+
+def folder_id(v):
+    m = re.search(r"drive\.google\.com/drive/(?:u/\d+/)?folders/([\w-]{10,})", v)
+    return m.group(1) if m else ""
+
+
+def natural_key(name):
+    return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", name)]
+
+
+def list_folder(fid, errors, warnings, where):
+    """공개 드라이브 폴더 안의 PDF 목록 [(파일id, 이름)] — 이름순(01_, 02_ … 순서 지정 가능)"""
+    url = f"https://drive.google.com/embeddedfolderview?id={fid}"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60) as r:
+            html = r.read().decode("utf-8", "replace")
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"{where}: 드라이브 폴더를 읽지 못했습니다 ({e}). 폴더 공유가 "
+                      "'링크가 있는 모든 사용자'인지 확인해 주세요.")
+        return None
+    entries = re.findall(r'id="entry-([\w-]+)".*?class="flip-entry-title">([^<]*)<', html, re.S)
+    if not entries:
+        if "flip-entry" not in html and "folder-contents" not in html:
+            errors.append(f"{where}: 드라이브 폴더를 열 수 없습니다. 폴더 공유를 "
+                          "'링크가 있는 모든 사용자 · 뷰어'로 바꿔 주세요.")
+        else:
+            warnings.append(f"{where}: 폴더가 비어 있습니다.")
+        return None
+    pdfs, others = [], []
+    for eid, name in entries:
+        name = html_unescape(name).strip()
+        (pdfs if name.lower().endswith(".pdf") else others).append((eid, name))
+    if others:
+        warnings.append(f"{where}: 폴더 안 PDF가 아닌 파일·하위 폴더는 뺐습니다: {', '.join(n for _, n in others)}")
+    return sorted(pdfs, key=lambda x: natural_key(x[1]))
+
+
+def clean_title(name):
+    """파일 이름 → 제목: 확장자와 순서용 앞번호(01_, 1. , 02- 등)를 뗌"""
+    name = re.sub(r"\.pdf$", "", name, flags=re.I)
+    return re.sub(r"^\d+\s*[._\-)]\s*", "", name).strip() or name
 
 
 def drive_id(v):
@@ -211,14 +255,25 @@ def main():
             title = row.get("title") or youtube_title(vid)
             m.update(type="video", youtube=vid)
         else:
-            if "drive.google.com/drive/folders" in f:
-                errors.append(f"{where}: 폴더 링크입니다. 폴더 안의 PDF 파일을 우클릭 → 링크 복사로 붙여 주세요.")
+            if folder_id(f):
+                # 폴더 링크: 안의 PDF 를 이름순으로 모두 가져옴 (제목 = 파일 이름)
+                files = list_folder(folder_id(f), errors, warnings, where)
+                for fid, name in files or []:
+                    got = fetch_drive(fid, errors, f"{where} {name}")
+                    if not got:
+                        continue
+                    fm = {"item": item, "type": "pdf", "file": got[0].relative_to(ROOT).as_posix(),
+                          "title": clean_title(name)}
+                    for key in ("group", "sub"):
+                        if row.get(key):
+                            fm[key] = row[key]
+                    out.append(fm)
                 continue
             got = fetch_drive(drive_id(f), errors, where) if drive_id(f) else local_pdf(f, errors, where)
             if not got:
                 continue
             path, fname = got
-            title = row.get("title") or fname
+            title = row.get("title") or clean_title(fname)
             m.update(type="pdf", file=path.relative_to(ROOT).as_posix())
 
         if not title:
