@@ -26,6 +26,7 @@ STAGES = {1: (94, 146), 2: (228, 258), 3: (269, 298), 4: (344, 390), 5: (448, 47
 ROAD_DASH_A = (4, 35)    # 학교 → 칠판 → 오른쪽 위로 이어지는 점선
 ROAD_DASH_B = (37, 90)   # 책상 → 두 학생 → 트로피 점선
 ROAD_DASH_TOP = (92, 93)  # 지구본 → 학교 점선
+ROAD = (3, 36, 91)  # 연두색 길 세 조각
 
 
 def in_ranges(i, ranges):
@@ -126,6 +127,9 @@ def main():
             dashes.append(path_el(dr, cls=f"dash dash-{dash_stage(i, dr['rect'])}"))
         elif i >= 526:
             pins.append(path_el(dr))
+        elif i in ROAD:
+            # 길은 PDF 에서 세 조각이라 이음매에 흰 선이 보임 → 같은 색 테두리로 겹쳐 메움
+            bg.append(path_el(dr).replace("/>", f' stroke="{hexcolor(dr["fill"])}" stroke-width="4" stroke-linejoin="round"/>'))
         else:
             bg.append(path_el(dr))
 
