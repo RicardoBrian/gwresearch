@@ -31,6 +31,7 @@
 
   // ---- 자료 목록 ----
   let materials = new Map();
+  let intros = {};
   let loadFailed = false;
   const dataReady = fetch(DATA_URL, { cache: 'no-cache' })
     .then((r) => {
@@ -40,6 +41,7 @@
       return r.json();
     })
     .then((data) => {
+      intros = data.intros || {};
       for (const m of data.materials || []) {
         if (!materials.has(m.item)) materials.set(m.item, []);
         materials.get(m.item).push(m);
@@ -262,12 +264,68 @@
         crumb: '<span>학생 성장 지원 로드맵</span>',
         tabs: stageTabs(stage),
       })}
-      <div class="viewer__body viewer__body--stage">
+      <div class="viewer__body viewer__body--stage${intros[stage.id] ? ' has-intro' : ''}">
+        ${intros[stage.id] ? `
+          <section class="intro" aria-label="${esc(stage.name)} 소개">
+            <div class="intro__track" tabindex="0"></div>
+            <button class="intro__nav intro__nav--prev" type="button" aria-label="이전 카드">${ICON.next}</button>
+            <button class="intro__nav intro__nav--next" type="button" aria-label="다음 카드">${ICON.next}</button>
+            <div class="intro__dots" aria-hidden="true"></div>
+          </section>` : ''}
         <ul class="cards">${cards}</ul>
       </div>`);
+    if (intros[stage.id]) showIntro(dialog.querySelector('.intro'), intros[stage.id]);
     // 휴대폰에서 가로로 넘치면 지금 단계 탭이 보이게
     const cur = dialog.querySelector('.stagetab[aria-current]');
     if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }
+
+  // ---- 단계 소개 카드뉴스: 정사각형 PDF 한 쪽 = 카드 한 장, 옆으로 넘김 ----
+  async function showIntro(box, file) {
+    const track = box.querySelector('.intro__track');
+    const dots = box.querySelector('.intro__dots');
+    let alive = true;
+    const prevCleanup = cleanup;
+    let task;
+    cleanup = () => { alive = false; if (task) task.destroy(); prevCleanup(); };
+    try {
+      const lib = await loadPdfjs();
+      task = lib.getDocument({ url: new URL(file, document.baseURI).href, cMapUrl: `${PDFJS}cmaps/`, cMapPacked: true, standardFontDataUrl: `${PDFJS}standard_fonts/` });
+      const doc = await task.promise;
+      const size = Math.max(track.clientWidth, 320) * Math.min(window.devicePixelRatio || 1, 2);
+      for (let n = 1; n <= doc.numPages && alive; n++) {
+        const page = await doc.getPage(n);
+        const vp = page.getViewport({ scale: size / page.getViewport({ scale: 1 }).width });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.floor(vp.width);
+        canvas.height = Math.floor(vp.height);
+        canvas.className = 'intro__card';
+        canvas.setAttribute('role', 'img');
+        canvas.setAttribute('aria-label', `소개 카드 ${n} / ${doc.numPages}`);
+        track.append(canvas);
+        dots.insertAdjacentHTML('beforeend', '<span></span>');
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+      }
+    } catch (err) {
+      if (alive) { console.error(err); box.remove(); }
+      return;
+    }
+    const cards = [...track.children];
+    const mark = () => {
+      const k = Math.round(track.scrollLeft / Math.max(1, cards[0].offsetWidth));
+      [...dots.children].forEach((d, j) => d.classList.toggle('is-on', j === k));
+      box.querySelector('.intro__nav--prev').disabled = k <= 0;
+      box.querySelector('.intro__nav--next').disabled = k >= cards.length - 1;
+    };
+    const go = (d) => track.scrollBy({ left: d * cards[0].offsetWidth, behavior: 'smooth' });
+    box.querySelector('.intro__nav--prev').addEventListener('click', () => go(-1));
+    box.querySelector('.intro__nav--next').addEventListener('click', () => go(1));
+    track.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') go(1);
+      if (e.key === 'ArrowLeft') go(-1);
+    });
+    track.addEventListener('scroll', () => requestAnimationFrame(mark), { passive: true });
+    mark();
   }
 
   // ---- 항목 자료 ----

@@ -16,7 +16,9 @@ export async function onRequestGet({ params, request, env, waitUntil }) {
 
   const list = await env.ASSETS.fetch(new URL('/assets/data.json', request.url));
   const data = list.ok ? await list.json() : { materials: [] };
-  if (!data.materials.some((m) => m.file === `pdf/${id}`)) return fail('자료 목록에 없는 파일입니다.', 404);
+  const listed = data.materials.some((m) => m.file === `pdf/${id}`)
+    || Object.values(data.intros || {}).includes(`pdf/${id}`);
+  if (!listed) return fail('자료 목록에 없는 파일입니다.', 404);
 
   const up = await fetch(`https://drive.google.com/uc?export=download&id=${id}`, { redirect: 'follow' });
   const body = await up.arrayBuffer();

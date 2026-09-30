@@ -255,13 +255,32 @@ def main():
     stage_of = {i: s for i, _, s in roadmap}
     name_of = {i: n for i, n, _ in roadmap}
 
-    errors, warnings, out = [], [], []
+    stage_names = list(dict.fromkeys(s for _, _, s in roadmap))
+    errors, warnings, out, intros = [], [], [], {}
     for n, row in enumerate(read_rows(), start=2):  # 시트 기준 행 번호 (1행은 제목)
         if not any(row.values()):
             continue
         where = f"{n}행({row.get('title') or row.get('item') or '제목 없음'})"
 
         raw = row.get("item", "")
+        if norm(raw) in ("단계소개", "소개"):
+            # 단계 소개 카드뉴스 (정사각형 PDF, 한 쪽 = 카드 한 장)
+            sname = norm(re.sub(r"^\d+", "", row.get("stage", "")))
+            num = next((k + 1 for k, s in enumerate(stage_names) if norm(s) == sname), 0)
+            f = row.get("file", "")
+            if not num:
+                errors.append(f"{where}: 단계 소개는 단계를 골라야 합니다.")
+            elif not f:
+                warnings.append(f"{where}: 단계 소개 PDF 링크가 비어 있어 뺐습니다.")
+            elif drive_id(f):
+                is_pdf, _, err = probe_drive(drive_id(f))
+                if is_pdf:
+                    intros[f"stage-{num}"] = f"pdf/{drive_id(f)}"
+                else:
+                    errors.append(f"{where}: 단계 소개 PDF를 받을 수 없습니다. 공유 설정을 확인해 주세요. {err}")
+            elif local_pdf(f, errors, where):
+                intros[f"stage-{num}"] = (DOCS / f).relative_to(ROOT).as_posix()
+            continue
         item = raw if raw in ids else by_name.get(norm(raw), "")
         if not item:
             if not raw:
@@ -359,7 +378,7 @@ def main():
             print(" -", e)
         sys.exit(1)
 
-    data = {"updated": datetime.date.today().isoformat(), "materials": out}
+    data = {"updated": datetime.date.today().isoformat(), "materials": out, "intros": intros}
     (ROOT / "assets" / "data.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"완료: 자료 {len(out)}개 → assets/data.json")
 
