@@ -99,6 +99,7 @@
 
   const ICON = {
     pdf: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 3v5h5M9 13h6M9 17h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    intro: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="13" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M20 8v10a2 2 0 0 1-2 2H8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     video: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 9.2v5.6l4.8-2.8z" fill="currentColor"/></svg>',
     close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
     next: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -245,7 +246,7 @@
     await dataReady;
     const cards = stage.items.map((it) => {
       const list = materials.get(it.id) || [];
-      let meta = summary(list);
+      let meta = !list.length && intros[it.id] ? '소개' : summary(list);
       if (hasGroups(list)) {
         const names = groupsOf(list).map((g) => g.name);
         meta = names.slice(0, 3).join(' · ') + (names.length > 3 ? ` 외 ${names.length - 3}` : '');
@@ -253,7 +254,7 @@
       return `
         <li><a class="card" href="#${esc(it.id)}">
           <span class="card__title">${esc(it.title)}</span>
-          <span class="card__meta${list.length ? '' : ' is-empty'}">${esc(meta)}</span>
+          <span class="card__meta${list.length || intros[it.id] ? '' : ' is-empty'}">${esc(meta)}</span>
           <span class="card__arrow">${ICON.next}</span>
         </a></li>`;
     }).join('');
@@ -265,13 +266,7 @@
         tabs: stageTabs(stage),
       })}
       <div class="viewer__body viewer__body--stage${intros[stage.id] ? ' has-intro' : ''}">
-        ${intros[stage.id] ? `
-          <section class="intro" aria-label="${esc(stage.name)} 소개">
-            <div class="intro__track" tabindex="0"></div>
-            <button class="intro__nav intro__nav--prev" type="button" aria-label="이전 카드">${ICON.next}</button>
-            <button class="intro__nav intro__nav--next" type="button" aria-label="다음 카드">${ICON.next}</button>
-            <div class="intro__dots" aria-hidden="true"></div>
-          </section>` : ''}
+        ${intros[stage.id] ? introMarkup(stage.name) : ''}
         <ul class="cards">${cards}</ul>
       </div>`);
     if (intros[stage.id]) showIntro(dialog.querySelector('.intro'), intros[stage.id]);
@@ -280,7 +275,17 @@
     if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'center' });
   }
 
-  // ---- 단계 소개 카드뉴스: 정사각형 PDF 한 쪽 = 카드 한 장, 옆으로 넘김 ----
+  // ---- 소개 카드뉴스 (단계·항목): 정사각형 PDF 한 쪽 = 카드 한 장, 옆으로 넘김 ----
+  function introMarkup(name) {
+    return `
+      <section class="intro" aria-label="${esc(name)} 소개">
+        <div class="intro__track" tabindex="0"></div>
+        <button class="intro__nav intro__nav--prev" type="button" aria-label="이전 카드">${ICON.next}</button>
+        <button class="intro__nav intro__nav--next" type="button" aria-label="다음 카드">${ICON.next}</button>
+        <div class="intro__dots" aria-hidden="true"></div>
+      </section>`;
+  }
+
   async function showIntro(box, file) {
     const track = box.querySelector('.intro__track');
     const dots = box.querySelector('.intro__dots');
@@ -346,7 +351,8 @@
       return;
     }
 
-    const list = current ? current.list : all;
+    const list = current ? current.list
+      : intros[item.id] ? [{ type: 'intro', title: '소개', file: intros[item.id] }, ...all] : all;
     const crumb = current
       ? `${stageLink}<span class="viewer__sep" aria-hidden="true">›</span><a class="viewer__crumbitem" href="#${esc(item.id)}" data-replace>${esc(item.title)}</a>`
       : stageLink;
@@ -385,7 +391,7 @@
               <button class="mlist__item" type="button" data-k="${k}" data-sub="${esc((m.sub || '').trim())}">
                 <span class="mlist__icon is-${esc(m.type)}">${ICON[m.type] || ICON.pdf}</span>
                 <span class="mlist__text"><span class="mlist__title">${esc(m.title)}</span>
-                <span class="mlist__type">${m.type === 'video' ? '영상' : '문서 · PDF'}${!subs.length || !m.sub ? '' : ` · ${esc(m.sub)}`}</span></span>
+                <span class="mlist__type">${{ video: '영상', intro: '카드뉴스' }[m.type] || '문서 · PDF'}${!subs.length || !m.sub ? '' : ` · ${esc(m.sub)}`}</span></span>
               </button>`).join('')}
           </nav>
         </div>` : ''}
@@ -401,7 +407,10 @@
       cleanup();
       cleanup = () => {};
       const m = list[k];
-      if (m.type === 'video') showVideo(pane, m);
+      if (m.type === 'intro') {
+        pane.innerHTML = `<div class="intro-pane">${introMarkup(item.title)}</div>`;
+        showIntro(pane.querySelector('.intro'), m.file);
+      } else if (m.type === 'video') showVideo(pane, m);
       else showPdf(pane, m, my);
     };
     buttons.forEach((b) => b.addEventListener('click', () => select(Number(b.dataset.k))));
@@ -431,9 +440,11 @@
         title: item.title,
         crumb: stageLink,
       })}
-      <div class="viewer__body viewer__body--stage">
+      <div class="viewer__body viewer__body--stage${intros[item.id] ? ' has-intro' : ''}">
+        ${intros[item.id] ? introMarkup(item.title) : ''}
         <ul class="cards">${cards}</ul>
       </div>`);
+    if (intros[item.id]) showIntro(dialog.querySelector('.intro'), intros[item.id]);
   }
 
   function state(title, text, stage) {

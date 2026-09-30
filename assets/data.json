@@ -38,6 +38,8 @@
     }
   ],
   "intros": {
-    "stage-1": "assets/docs/sample/intro-cards.pdf"
+    "stage-1": "assets/docs/sample/intro-cards.pdf",
+    "kls-prerequisite": "assets/docs/sample/intro-cards.pdf",
+    "life-adaptation": "assets/docs/sample/intro-cards.pdf"
   }
 }

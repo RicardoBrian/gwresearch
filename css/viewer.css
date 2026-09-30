@@ -730,6 +730,18 @@ html.has-modal { overflow: hidden; }
 
 .intro__dots span.is-on { width: 20px; border-radius: 4px; background: var(--green); }
 
+/* 항목 안 '소개' (자료 목록 첫 칸) */
+.intro-pane {
+  overflow: auto;
+  padding: 24px;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  background: var(--paper);
+}
+
+.intro-pane .intro { width: min(100%, calc(100dvh - 200px)); }
+
 /* ---------- 단계 개요 카드 ---------- */
 .cards {
   display: grid;
@@ -950,6 +962,7 @@ html.has-modal { overflow: hidden; }
   .viewer__body--stage.has-intro { grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .intro__nav { display: none; }
   .intro__track { border-radius: 14px; }
+  .intro-pane { padding: 12px; }
   .cards { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .card { min-height: 0; padding: 16px 56px 16px 16px; }
 }

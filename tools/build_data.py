@@ -248,6 +248,22 @@ def local_pdf(f, errors, where):
     return path, path.stem
 
 
+def intro_file(f, errors, warnings, where):
+    """카드뉴스 PDF 링크 → 사이트 경로. 문제가 있으면 errors/warnings 에 넣고 None"""
+    if not f:
+        warnings.append(f"{where}: 카드뉴스 PDF 링크가 비어 있어 뺐습니다.")
+        return None
+    if drive_id(f):
+        is_pdf, _, err = probe_drive(drive_id(f))
+        if is_pdf:
+            return f"pdf/{drive_id(f)}"
+        errors.append(f"{where}: 카드뉴스 PDF를 받을 수 없습니다. 공유 설정을 확인해 주세요. {err}")
+        return None
+    if local_pdf(f, errors, where):
+        return (DOCS / f).relative_to(ROOT).as_posix()
+    return None
+
+
 def main():
     roadmap = load_roadmap()
     ids = [i for i, _, _ in roadmap]
@@ -267,19 +283,12 @@ def main():
             # 단계 소개 카드뉴스 (정사각형 PDF, 한 쪽 = 카드 한 장)
             sname = norm(re.sub(r"^\d+", "", row.get("stage", "")))
             num = next((k + 1 for k, s in enumerate(stage_names) if norm(s) == sname), 0)
-            f = row.get("file", "")
             if not num:
                 errors.append(f"{where}: 단계 소개는 단계를 골라야 합니다.")
-            elif not f:
-                warnings.append(f"{where}: 단계 소개 PDF 링크가 비어 있어 뺐습니다.")
-            elif drive_id(f):
-                is_pdf, _, err = probe_drive(drive_id(f))
-                if is_pdf:
-                    intros[f"stage-{num}"] = f"pdf/{drive_id(f)}"
-                else:
-                    errors.append(f"{where}: 단계 소개 PDF를 받을 수 없습니다. 공유 설정을 확인해 주세요. {err}")
-            elif local_pdf(f, errors, where):
-                intros[f"stage-{num}"] = (DOCS / f).relative_to(ROOT).as_posix()
+            else:
+                path = intro_file(row.get("file", ""), errors, warnings, where)
+                if path:
+                    intros[f"stage-{num}"] = path
             continue
         item = raw if raw in ids else by_name.get(norm(raw), "")
         if not item:
@@ -292,6 +301,13 @@ def main():
         stage = row.get("stage", "")
         if stage and norm(re.sub(r"^\d+", "", stage)) != norm(stage_of[item]):
             errors.append(f"{where}: '{name_of[item]}'은(는) '{stage_of[item]}' 단계 항목입니다. 단계를 확인해 주세요.")
+            continue
+
+        if norm(row.get("group", "")) == "소개":
+            # 항목 소개 카드뉴스: 분류 칸에 '소개'
+            path = intro_file(row.get("file", ""), errors, warnings, where)
+            if path:
+                intros[item] = path
             continue
 
         f, yt = row.get("file", ""), row.get("youtube", "")
@@ -366,7 +382,7 @@ def main():
                 m[key] = row[key]
         out.append(m)
 
-    empty = [name_of[i] for i in ids if i not in {m["item"] for m in out}]
+    empty = [name_of[i] for i in ids if i not in {m["item"] for m in out} and i not in intros]
     if empty:
         warnings.append(f"자료 없는 항목 {len(empty)}개 (‘자료 준비 중’으로 표시): {', '.join(empty)}")
 
