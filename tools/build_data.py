@@ -179,6 +179,21 @@ def clean_title(name):
     return re.sub(r"^\d+\s*[._\-)]\s*", "", name).strip() or name
 
 
+def web_url(f):
+    """웹 주소로 보이면 https 주소로 정리 (예: 'kakainfo.com/견본' → 'https://kakainfo.com/%EA%B2%AC%EB%B3%B8')
+    드라이브 링크나 웹 주소가 아니면 '' """
+    f = f.strip()
+    if drive_id(f) or folder_id(f):
+        return ""
+    if not re.match(r"https?://", f, re.I):
+        # 'www.x.com', 'x.co.kr/경로' 처럼 앞에 https:// 를 안 붙인 주소
+        if not re.match(r"[\w-]+(\.[\w-]+)+(:\d+)?(/|$)", f) or f.lower().endswith(".pdf") and "/" not in f:
+            return ""
+        f = "https://" + f
+    # 한글·공백이 섞인 주소도 브라우저와 똑같이 처리되도록 인코딩 (이미 인코딩된 % 는 그대로)
+    return urllib.parse.quote(f, safe=":/?#[]@!$&'()*+,;=%~")
+
+
 def probe_web(url):
     """웹 페이지 제목과, 다른 사이트 창 안에 띄우기를 허용하는지 (X-Frame-Options / frame-ancestors)"""
     try:
@@ -257,7 +272,7 @@ def local_pdf(f, errors, where):
     """저장소 안 PDF (견본용). 실제 자료는 드라이브 링크를 씀."""
     path = DOCS / f
     if not path.exists():
-        errors.append(f"{where}: PDF 링크가 드라이브 파일 링크가 아닙니다: {f}")
+        errors.append(f"{where}: 링크를 알아볼 수 없습니다 (드라이브 파일·폴더 링크 또는 웹 주소): {f}")
         return None
     if path.suffix.lower() != ".pdf":
         errors.append(f"{where}: PDF만 올릴 수 있습니다 ({path.suffix}).")
@@ -371,7 +386,8 @@ def main():
                             fm[key] = row[key]
                     out.append(fm)
                 continue
-            if not drive_id(f) and re.match(r"https?://", f, re.I):
+            if web_url(f):
+                f = web_url(f)
                 # 웹사이트·웹앱: 자료 창 안에 띄움 (막힌 사이트는 '새 창에서 열기' 카드)
                 if f.lower().startswith("http://"):
                     warnings.append(f"{where}: http:// 주소는 창 안에 띄울 수 없어 새 창으로만 엽니다. https:// 주소를 권합니다.")
