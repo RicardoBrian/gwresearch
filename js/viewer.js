@@ -103,6 +103,7 @@
     intro: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="13" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M20 8v10a2 2 0 0 1-2 2H8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     web: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
     back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    reload: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7M6 9.5V20h12V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     full: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     video: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 9.2v5.6l4.8-2.8z" fill="currentColor"/></svg>',
@@ -137,13 +138,15 @@
   }
 
   function close() {
-    const d = depth();
-    if (d > 0) {
-      history.go(-d);
-    } else {
+    const shut = () => {
       history.replaceState(null, '', location.pathname + location.search);
       render();
-    }
+    };
+    const d = depth();
+    if (d <= 0) return shut();
+    history.go(-d);
+    // 창 안에 띄운 웹사이트에서 이동했으면 그 기록이 끼어 있어 위에서 다 못 돌아감 → 그래도 닫기
+    setTimeout(() => { if (routeOf(location.hash)) shut(); }, 400);
   }
 
   document.addEventListener('click', (e) => {
@@ -535,9 +538,9 @@
             <div class="pdf__name"><div class="pdf__nameline"><h3 class="pane__title">${esc(m.title)}</h3></div>
               ${m.desc ? `<p class="pdf__desc" title="${esc(m.desc)}">${esc(m.desc)}</p>` : ''}</div>
             <div class="pdf__tools">
-              <button class="icon-btn web-back" type="button" aria-label="뒤로" title="뒤로" disabled>${ICON.back}</button>
-              <button class="icon-btn web-fwd" type="button" aria-label="앞으로" title="앞으로" disabled>${ICON.next}</button>
-              <button class="icon-btn web-home" type="button" aria-label="처음 화면" title="처음 화면">${ICON.home}</button>
+              <button class="icon-btn web-back" type="button" aria-label="뒤로" title="뒤로">${ICON.back}</button>
+              <button class="icon-btn web-fwd" type="button" aria-label="앞으로" title="앞으로">${ICON.next}</button>
+              <button class="icon-btn web-reload" type="button" aria-label="새로고침 (처음 화면으로)" title="새로고침 (처음 화면으로)">${ICON.reload}</button>
               <button class="icon-btn web-full" type="button" aria-label="전체 화면" title="전체 화면">${ICON.full}</button>
               <a class="btn btn--solid" href="${url}" target="_blank" rel="noopener">${ICON.external}<span>새 창에서 열기</span></a>
             </div>
@@ -549,38 +552,24 @@
       const f = pane.querySelector('.web-frame');
       pane.querySelector('.web-full').addEventListener('click', () => (f.requestFullscreen || f.webkitRequestFullscreen || (() => {})).call(f));
 
-      // 뒤로·앞으로: 다른 사이트 안의 이동 기록은 직접 볼 수 없어서, 창 안에서 페이지가 바뀐 횟수를 세어
-      // 갈 곳이 있을 때만 브라우저 뒤로/앞으로(창 안부터 이동)를 씀
-      const back = pane.querySelector('.web-back');
-      const fwd = pane.querySelector('.web-fwd');
-      let loads = 0;
-      let backSteps = 0;
-      let fwdSteps = 0;
-      let moving = '';
-      const sync = () => { back.disabled = backSteps <= 0; fwd.disabled = fwdSteps <= 0; };
-      f.addEventListener('load', () => {
-        loads += 1;
-        if (moving) moving = '';
-        else if (loads > 1) { backSteps += 1; fwdSteps = 0; } // 새로 이동하면 앞으로 기록은 사라짐
-        sync();
-      });
-      back.addEventListener('click', () => {
-        if (backSteps <= 0) return;
-        backSteps -= 1; fwdSteps += 1; moving = 'back'; sync();
-        history.back();
-      });
-      fwd.addEventListener('click', () => {
-        if (fwdSteps <= 0) return;
-        fwdSteps -= 1; backSteps += 1; moving = 'fwd'; sync();
-        history.forward();
-      });
-      pane.querySelector('.web-home').addEventListener('click', () => {
-        loads = 0;
-        backSteps = 0;
-        fwdSteps = 0;
-        sync();
-        f.src = m.url;
-      });
+      // 뒤로·앞으로: 창 안 사이트의 이동은 브라우저 기록에 함께 쌓이므로 브라우저 뒤로/앞으로를 그대로 씀
+      // (페이지를 새로 불러오지 않는 앱의 이동도 따라감). 첫 화면에서 '뒤로'를 눌러도 자료 창을
+      // 벗어나지 않도록, 웹 자료를 열 때 같은 주소의 기록을 하나 깔아 두고 버튼으로 그보다 뒤로 가면 되돌림.
+      const guardState = () => ({ ...(history.state || {}), webGuard: true, viewerDepth: depth() + 1 });
+      history.pushState(guardState(), '', location.hash);
+      let viaButton = false;
+      const onPop = () => {
+        // 버튼으로 첫 화면보다 더 뒤로 갔으면 한 칸 앞으로 되돌려 자료 창에 머묾 (앞으로 기록은 유지)
+        if (viaButton && !(history.state && history.state.webGuard) && dialog.contains(f)) history.forward();
+        viaButton = false;
+      };
+      window.addEventListener('popstate', onPop);
+      const prevCleanup = cleanup;
+      cleanup = () => { window.removeEventListener('popstate', onPop); prevCleanup(); };
+      pane.querySelector('.web-back').addEventListener('click', () => { viaButton = true; history.back(); });
+      pane.querySelector('.web-fwd').addEventListener('click', () => history.forward());
+      // 다른 사이트의 '지금 페이지'는 보안상 다시 불러올 수 없어 처음 주소로 다시 불러옴
+      pane.querySelector('.web-reload').addEventListener('click', () => { f.src = m.url; });
     };
     if (m.embed === false) {
       pane.innerHTML = card('이 사이트는 다른 페이지 안에서 열리지 않도록 설정되어 있어 새 창으로 엽니다.');
