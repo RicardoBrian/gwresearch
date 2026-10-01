@@ -102,8 +102,6 @@
     pdf: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 3v5h5M9 13h6M9 17h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     intro: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="13" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M20 8v10a2 2 0 0 1-2 2H8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     web: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
-    back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    reload: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7M6 9.5V20h12V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     full: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     video: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 9.2v5.6l4.8-2.8z" fill="currentColor"/></svg>',
@@ -538,9 +536,7 @@
             <div class="pdf__name"><div class="pdf__nameline"><h3 class="pane__title">${esc(m.title)}</h3></div>
               ${m.desc ? `<p class="pdf__desc" title="${esc(m.desc)}">${esc(m.desc)}</p>` : ''}</div>
             <div class="pdf__tools">
-              <button class="icon-btn web-back" type="button" aria-label="뒤로" title="뒤로">${ICON.back}</button>
-              <button class="icon-btn web-fwd" type="button" aria-label="앞으로" title="앞으로">${ICON.next}</button>
-              <button class="icon-btn web-reload" type="button" aria-label="새로고침 (처음 화면으로)" title="새로고침 (처음 화면으로)">${ICON.reload}</button>
+              <button class="icon-btn web-home" type="button" aria-label="처음 화면" title="처음 화면">${ICON.home}</button>
               <button class="icon-btn web-full" type="button" aria-label="전체 화면" title="전체 화면">${ICON.full}</button>
               <a class="btn btn--solid" href="${url}" target="_blank" rel="noopener">${ICON.external}<span>새 창에서 열기</span></a>
             </div>
@@ -552,24 +548,9 @@
       const f = pane.querySelector('.web-frame');
       pane.querySelector('.web-full').addEventListener('click', () => (f.requestFullscreen || f.webkitRequestFullscreen || (() => {})).call(f));
 
-      // 뒤로·앞으로: 창 안 사이트의 이동은 브라우저 기록에 함께 쌓이므로 브라우저 뒤로/앞으로를 그대로 씀
-      // (페이지를 새로 불러오지 않는 앱의 이동도 따라감). 첫 화면에서 '뒤로'를 눌러도 자료 창을
-      // 벗어나지 않도록, 웹 자료를 열 때 같은 주소의 기록을 하나 깔아 두고 버튼으로 그보다 뒤로 가면 되돌림.
-      const guardState = () => ({ ...(history.state || {}), webGuard: true, viewerDepth: depth() + 1 });
-      history.pushState(guardState(), '', location.hash);
-      let viaButton = false;
-      const onPop = () => {
-        // 버튼으로 첫 화면보다 더 뒤로 갔으면 한 칸 앞으로 되돌려 자료 창에 머묾 (앞으로 기록은 유지)
-        if (viaButton && !(history.state && history.state.webGuard) && dialog.contains(f)) history.forward();
-        viaButton = false;
-      };
-      window.addEventListener('popstate', onPop);
-      const prevCleanup = cleanup;
-      cleanup = () => { window.removeEventListener('popstate', onPop); prevCleanup(); };
-      pane.querySelector('.web-back').addEventListener('click', () => { viaButton = true; history.back(); });
-      pane.querySelector('.web-fwd').addEventListener('click', () => history.forward());
-      // 다른 사이트의 '지금 페이지'는 보안상 다시 불러올 수 없어 처음 주소로 다시 불러옴
-      pane.querySelector('.web-reload').addEventListener('click', () => { f.src = m.url; });
+      // 처음 화면: 처음 주소로 다시 불러오기
+      // (뒤로·앞으로는 창 안 사이트마다 기록이 다르게 쌓여 믿을 수 없어 두지 않음)
+      pane.querySelector('.web-home').addEventListener('click', () => { f.src = m.url; });
     };
     if (m.embed === false) {
       pane.innerHTML = card('이 사이트는 다른 페이지 안에서 열리지 않도록 설정되어 있어 새 창으로 엽니다.');
