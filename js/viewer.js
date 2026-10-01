@@ -102,6 +102,8 @@
     pdf: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 3v5h5M9 13h6M9 17h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     intro: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="13" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M20 8v10a2 2 0 0 1-2 2H8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     web: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+    back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7M6 9.5V20h12V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     full: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     video: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 9.2v5.6l4.8-2.8z" fill="currentColor"/></svg>',
     close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
@@ -533,6 +535,8 @@
             <div class="pdf__name"><div class="pdf__nameline"><h3 class="pane__title">${esc(m.title)}</h3></div>
               ${m.desc ? `<p class="pdf__desc" title="${esc(m.desc)}">${esc(m.desc)}</p>` : ''}</div>
             <div class="pdf__tools">
+              <button class="icon-btn web-back" type="button" aria-label="뒤로" title="뒤로" disabled>${ICON.back}</button>
+              <button class="icon-btn web-home" type="button" aria-label="처음 화면" title="처음 화면">${ICON.home}</button>
               <button class="icon-btn web-full" type="button" aria-label="전체 화면" title="전체 화면">${ICON.full}</button>
               <a class="btn btn--solid" href="${url}" target="_blank" rel="noopener">${ICON.external}<span>새 창에서 열기</span></a>
             </div>
@@ -543,6 +547,32 @@
         </div>`;
       const f = pane.querySelector('.web-frame');
       pane.querySelector('.web-full').addEventListener('click', () => (f.requestFullscreen || f.webkitRequestFullscreen || (() => {})).call(f));
+
+      // 뒤로: 다른 사이트 안의 이동 기록은 직접 볼 수 없어서, 창 안에서 페이지가 바뀐 횟수를 세어
+      // 바뀐 적이 있을 때만 브라우저 '뒤로'(창 안부터 되돌아감)를 씀
+      const back = pane.querySelector('.web-back');
+      let loads = 0;
+      let steps = 0;
+      let goingBack = false;
+      f.addEventListener('load', () => {
+        loads += 1;
+        if (goingBack) goingBack = false;
+        else if (loads > 1) steps += 1;
+        back.disabled = steps <= 0;
+      });
+      back.addEventListener('click', () => {
+        if (steps <= 0) return;
+        steps -= 1;
+        goingBack = true;
+        back.disabled = steps <= 0;
+        history.back();
+      });
+      pane.querySelector('.web-home').addEventListener('click', () => {
+        loads = 0;
+        steps = 0;
+        back.disabled = true;
+        f.src = m.url;
+      });
     };
     if (m.embed === false) {
       pane.innerHTML = card('이 사이트는 다른 페이지 안에서 열리지 않도록 설정되어 있어 새 창으로 엽니다.');

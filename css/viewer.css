@@ -752,6 +752,7 @@ html.has-modal { overflow: hidden; }
 }
 
 .web-card { background: var(--paper); }
+.icon-btn:disabled { opacity: .35; cursor: default; pointer-events: none; }
 .web-card__icon { color: var(--green); margin-bottom: 6px; }
 .web-card__icon svg { width: 44px; height: 44px; }
 .web-card__btns { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 14px; }
