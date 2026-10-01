@@ -10,7 +10,8 @@
   - 항목        : 로드맵 항목 이름 그대로. 필수
   - 분류        : 선택. 채우면 항목을 눌렀을 때 분류 카드(국어·수학…)가 먼저 나옴
   - 제목        : 선택. 비우면 드라이브 파일 이름 / 유튜브 영상 제목을 씀
-  - PDF 링크    : 구글 드라이브 PDF 파일 링크, 또는 폴더 링크(안의 PDF 전부, 이름순, 제목=파일 이름)
+  - PDF 링크    : 구글 드라이브 PDF 파일 링크, 폴더 링크(안의 PDF 전부, 이름순, 제목=파일 이름),
+                  또는 웹사이트·웹앱 주소(https, 자료 창 안에 띄움)
                   공유: 링크가 있는 모든 사용자
   - 유튜브 링크 : 영상 주소 (유튜브 또는 드라이브 영상 파일 링크). PDF 링크와 둘 중 하나만
   - 설명        : 선택
@@ -176,6 +177,22 @@ def clean_title(name):
     name = re.sub(r"^(?:Copy of|사본)\s+", "", name)
     name = re.sub(r"\.(pdf|mp4|mov|m4v|avi|wmv|mkv|webm)$", "", name, flags=re.I)
     return re.sub(r"^\d+\s*[._\-)]\s*", "", name).strip() or name
+
+
+def probe_web(url):
+    """웹 페이지 제목과, 다른 사이트 창 안에 띄우기를 허용하는지 (X-Frame-Options / frame-ancestors)"""
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=20) as r:
+            xfo = (r.headers.get("X-Frame-Options") or "").lower()
+            csp = (r.headers.get("Content-Security-Policy") or "").lower()
+            html = r.read(300_000).decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001  (확인 못 하면 일단 띄워 봄)
+        return "", True
+    m = re.search(r"<title[^>]*>(.*?)</title>", html, re.S | re.I)
+    title = html_unescape(m.group(1)).strip() if m else ""
+    fa = re.search(r"frame-ancestors([^;]*)", csp)
+    blocked = xfo in ("deny", "sameorigin") or (fa and "*" not in fa.group(1) and "https:" not in fa.group(1))
+    return title, not blocked
 
 
 def drive_id(v):
@@ -354,7 +371,14 @@ def main():
                             fm[key] = row[key]
                     out.append(fm)
                 continue
-            if drive_id(f):
+            if not drive_id(f) and re.match(r"https?://", f, re.I):
+                # 웹사이트·웹앱: 자료 창 안에 띄움 (막힌 사이트는 '새 창에서 열기' 카드)
+                if f.lower().startswith("http://"):
+                    warnings.append(f"{where}: http:// 주소는 창 안에 띄울 수 없어 새 창으로만 엽니다. https:// 주소를 권합니다.")
+                page_title, embed = probe_web(f)
+                title = row.get("title") or page_title or row.get("group") or "웹 페이지"
+                m.update(type="web", url=f, embed=embed and f.lower().startswith("https://"))
+            elif drive_id(f):
                 is_pdf, fname, err = probe_drive(drive_id(f))
                 if err:
                     errors.append(f"{where}: 드라이브 파일을 확인하지 못했습니다 ({err}). 파일이 지워졌는지 확인해 주세요.")

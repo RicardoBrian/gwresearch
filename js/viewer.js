@@ -94,12 +94,15 @@
     if (!list.length) return '자료 준비 중';
     const pdf = list.filter((m) => m.type === 'pdf').length;
     const video = list.filter((m) => m.type === 'video').length;
-    return [pdf && `문서 ${pdf}`, video && `영상 ${video}`].filter(Boolean).join(' · ');
+    const web = list.filter((m) => m.type === 'web').length;
+    return [pdf && `문서 ${pdf}`, video && `영상 ${video}`, web && `웹 ${web}`].filter(Boolean).join(' · ');
   }
 
   const ICON = {
     pdf: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 3v5h5M9 13h6M9 17h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     intro: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="13" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M20 8v10a2 2 0 0 1-2 2H8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    web: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+    full: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     video: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 9.2v5.6l4.8-2.8z" fill="currentColor"/></svg>',
     close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
     next: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -391,7 +394,7 @@
               <button class="mlist__item" type="button" data-k="${k}" data-sub="${esc((m.sub || '').trim())}">
                 <span class="mlist__icon is-${esc(m.type)}">${ICON[m.type] || ICON.pdf}</span>
                 <span class="mlist__text"><span class="mlist__title">${esc(m.title)}</span>
-                <span class="mlist__type">${{ video: '영상', intro: '카드뉴스' }[m.type] || '문서 · PDF'}${!subs.length || !m.sub ? '' : ` · ${esc(m.sub)}`}</span></span>
+                <span class="mlist__type">${{ video: '영상', intro: '카드뉴스', web: '웹' }[m.type] || '문서 · PDF'}${!subs.length || !m.sub ? '' : ` · ${esc(m.sub)}`}</span></span>
               </button>`).join('')}
           </nav>
         </div>` : ''}
@@ -410,7 +413,8 @@
       if (m.type === 'intro') {
         pane.innerHTML = `<div class="intro-pane">${introMarkup(item.title)}</div>`;
         showIntro(pane.querySelector('.intro'), m.file);
-      } else if (m.type === 'video') showVideo(pane, m);
+      } else if (m.type === 'web') showWeb(pane, m);
+      else if (m.type === 'video') showVideo(pane, m);
       else showPdf(pane, m, my);
     };
     buttons.forEach((b) => b.addEventListener('click', () => select(Number(b.dataset.k))));
@@ -504,6 +508,50 @@
           <a class="btn" href="https://drive.google.com/file/d/${id}/view" target="_blank" rel="noopener">${ICON.external}드라이브에서 보기</a>
         </div>
       </div>`;
+  }
+
+  // ---- 웹사이트·웹앱 ----
+  // 막힌 사이트(embed:false)나 휴대폰에서는 먼저 카드로 보여주고 '새 창에서 열기'
+  function showWeb(pane, m) {
+    const url = esc(m.url);
+    const small = matchMedia('(max-width: 767.98px)').matches;
+    const card = (note) => `
+      <div class="state web-card">
+        <span class="web-card__icon">${ICON.web}</span>
+        <p class="state__title">${esc(m.title)}</p>
+        ${m.desc ? `<p class="state__text">${esc(m.desc)}</p>` : ''}
+        <p class="state__text">${note}</p>
+        <div class="web-card__btns">
+          <a class="btn btn--solid" href="${url}" target="_blank" rel="noopener">${ICON.external}새 창에서 열기</a>
+          ${m.embed === false ? '' : '<button class="btn web-card__here" type="button">여기서 보기</button>'}
+        </div>
+      </div>`;
+    const frame = () => {
+      pane.innerHTML = `
+        <div class="pdf">
+          <div class="pdf__bar">
+            <div class="pdf__name"><div class="pdf__nameline"><h3 class="pane__title">${esc(m.title)}</h3></div>
+              ${m.desc ? `<p class="pdf__desc" title="${esc(m.desc)}">${esc(m.desc)}</p>` : ''}</div>
+            <div class="pdf__tools">
+              <button class="icon-btn web-full" type="button" aria-label="전체 화면" title="전체 화면">${ICON.full}</button>
+              <a class="btn btn--solid" href="${url}" target="_blank" rel="noopener">${ICON.external}<span>새 창에서 열기</span></a>
+            </div>
+          </div>
+          <iframe class="web-frame" src="${url}" title="${esc(m.title)}" loading="lazy"
+            allow="fullscreen; clipboard-read; clipboard-write; camera; microphone; geolocation; autoplay"
+            referrerpolicy="strict-origin-when-cross-origin"></iframe>
+        </div>`;
+      const f = pane.querySelector('.web-frame');
+      pane.querySelector('.web-full').addEventListener('click', () => (f.requestFullscreen || f.webkitRequestFullscreen || (() => {})).call(f));
+    };
+    if (m.embed === false) {
+      pane.innerHTML = card('이 사이트는 다른 페이지 안에서 열리지 않도록 설정되어 있어 새 창으로 엽니다.');
+    } else if (small) {
+      pane.innerHTML = card('휴대폰에서는 새 창으로 여는 것이 더 편합니다.');
+      pane.querySelector('.web-card__here').addEventListener('click', frame);
+    } else {
+      frame();
+    }
   }
 
   // ---- PDF ----
