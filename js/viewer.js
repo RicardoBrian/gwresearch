@@ -536,6 +536,7 @@
               ${m.desc ? `<p class="pdf__desc" title="${esc(m.desc)}">${esc(m.desc)}</p>` : ''}</div>
             <div class="pdf__tools">
               <button class="icon-btn web-back" type="button" aria-label="뒤로" title="뒤로" disabled>${ICON.back}</button>
+              <button class="icon-btn web-fwd" type="button" aria-label="앞으로" title="앞으로" disabled>${ICON.next}</button>
               <button class="icon-btn web-home" type="button" aria-label="처음 화면" title="처음 화면">${ICON.home}</button>
               <button class="icon-btn web-full" type="button" aria-label="전체 화면" title="전체 화면">${ICON.full}</button>
               <a class="btn btn--solid" href="${url}" target="_blank" rel="noopener">${ICON.external}<span>새 창에서 열기</span></a>
@@ -548,29 +549,36 @@
       const f = pane.querySelector('.web-frame');
       pane.querySelector('.web-full').addEventListener('click', () => (f.requestFullscreen || f.webkitRequestFullscreen || (() => {})).call(f));
 
-      // 뒤로: 다른 사이트 안의 이동 기록은 직접 볼 수 없어서, 창 안에서 페이지가 바뀐 횟수를 세어
-      // 바뀐 적이 있을 때만 브라우저 '뒤로'(창 안부터 되돌아감)를 씀
+      // 뒤로·앞으로: 다른 사이트 안의 이동 기록은 직접 볼 수 없어서, 창 안에서 페이지가 바뀐 횟수를 세어
+      // 갈 곳이 있을 때만 브라우저 뒤로/앞으로(창 안부터 이동)를 씀
       const back = pane.querySelector('.web-back');
+      const fwd = pane.querySelector('.web-fwd');
       let loads = 0;
-      let steps = 0;
-      let goingBack = false;
+      let backSteps = 0;
+      let fwdSteps = 0;
+      let moving = '';
+      const sync = () => { back.disabled = backSteps <= 0; fwd.disabled = fwdSteps <= 0; };
       f.addEventListener('load', () => {
         loads += 1;
-        if (goingBack) goingBack = false;
-        else if (loads > 1) steps += 1;
-        back.disabled = steps <= 0;
+        if (moving) moving = '';
+        else if (loads > 1) { backSteps += 1; fwdSteps = 0; } // 새로 이동하면 앞으로 기록은 사라짐
+        sync();
       });
       back.addEventListener('click', () => {
-        if (steps <= 0) return;
-        steps -= 1;
-        goingBack = true;
-        back.disabled = steps <= 0;
+        if (backSteps <= 0) return;
+        backSteps -= 1; fwdSteps += 1; moving = 'back'; sync();
         history.back();
+      });
+      fwd.addEventListener('click', () => {
+        if (fwdSteps <= 0) return;
+        fwdSteps -= 1; backSteps += 1; moving = 'fwd'; sync();
+        history.forward();
       });
       pane.querySelector('.web-home').addEventListener('click', () => {
         loads = 0;
-        steps = 0;
-        back.disabled = true;
+        backSteps = 0;
+        fwdSteps = 0;
+        sync();
         f.src = m.url;
       });
     };
