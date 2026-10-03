@@ -276,7 +276,8 @@ def local_pdf(f, errors, where):
     """저장소 안 PDF (견본용). 실제 자료는 드라이브 링크를 씀."""
     path = DOCS / f
     if not path.exists():
-        errors.append(f"{where}: 링크를 알아볼 수 없습니다 (드라이브 파일·폴더 링크 또는 웹 주소): {f}")
+        errors.append(f"{where}: 링크를 알아볼 수 없습니다: '{f}' — 칸에 주소(https://…)를 그대로 붙여 넣어 주세요. "
+                      "글자에 링크를 걸거나 스마트칩으로 넣으면 주소를 읽을 수 없습니다.")
         return None
     if path.suffix.lower() != ".pdf":
         errors.append(f"{where}: PDF만 올릴 수 있습니다 ({path.suffix}).")
