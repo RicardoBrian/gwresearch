@@ -861,6 +861,22 @@ html.has-modal { overflow: hidden; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.loading {
+  flex: 1 0 100%;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* 자료 고르기 드롭다운 (태블릿·휴대폰에서 가로 목록 대신) */
+.mpick { display: none; }
+
 /* 화면 높이가 낮으면(태블릿 가로, 배율 큰 노트북) 머리글 그림 숨김 */
 @media (max-height: 820px) {
   .viewer__art { display: none; }
@@ -917,6 +933,35 @@ html.has-modal { overflow: hidden; }
   .mlist__icon svg { width: 17px; height: 17px; }
   .mlist__type { display: none; }
   .mlist__title { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .mside .mlist, .subfilter { display: none; }
+
+  .mpick {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  .mpick__select {
+    flex: 0 1 420px;
+    min-width: 0;
+    height: 40px;
+    padding: 0 38px 0 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23476b2c' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center / 18px;
+    color: var(--ink);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    appearance: none;
+    cursor: pointer;
+  }
+
+  .mpick__select:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+  .mpick__count { flex: none; color: var(--muted); font-size: 14px; font-weight: 600; }
 
   .pdf__tools .btn--solid span { display: none; }
   .pdf__tools .btn--solid { width: 36px; padding: 0; }

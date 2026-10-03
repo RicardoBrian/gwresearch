@@ -282,6 +282,17 @@
   }
 
   // ---- 소개 카드뉴스 (단계·항목): 정사각형 PDF 한 쪽 = 카드 한 장, 옆으로 넘김 ----
+  const TYPES = { video: '영상', intro: '카드뉴스', web: '웹' };
+
+  // 불러오는 중 표시 (용량을 알면 % 함께)
+  const LOADING = '<div class="loading" role="status"><span class="spinner"></span><span class="loading__text">불러오는 중…</span></div>';
+  function progress(task, box) {
+    task.onProgress = ({ loaded, total }) => {
+      const t = box.querySelector('.loading__text');
+      if (t && total) t.textContent = `불러오는 중… ${Math.min(99, Math.round((loaded / total) * 100))}%`;
+    };
+  }
+
   function introMarkup(name) {
     return `
       <section class="intro" aria-label="${esc(name)} 소개">
@@ -302,7 +313,10 @@
     try {
       const lib = await loadPdfjs();
       task = lib.getDocument({ url: new URL(file, document.baseURI).href, cMapUrl: `${PDFJS}cmaps/`, cMapPacked: true, standardFontDataUrl: `${PDFJS}standard_fonts/` });
+      track.innerHTML = LOADING;
+      progress(task, track);
       const doc = await task.promise;
+      track.replaceChildren();
       const size = Math.max(track.clientWidth, 320) * Math.min(window.devicePixelRatio || 1, 2);
       for (let n = 1; n <= doc.numPages && alive; n++) {
         const page = await doc.getPage(n);
@@ -397,19 +411,36 @@
               <button class="mlist__item" type="button" data-k="${k}" data-sub="${esc((m.sub || '').trim())}">
                 <span class="mlist__icon is-${esc(m.type)}">${ICON[m.type] || ICON.pdf}</span>
                 <span class="mlist__text"><span class="mlist__title">${esc(m.title)}</span>
-                <span class="mlist__type">${{ video: '영상', intro: '카드뉴스', web: '웹' }[m.type] || '문서 · PDF'}${!subs.length || !m.sub ? '' : ` · ${esc(m.sub)}`}</span></span>
+                <span class="mlist__type">${TYPES[m.type] || '문서 · PDF'}${!subs.length || !m.sub ? '' : ` · ${esc(m.sub)}`}</span></span>
               </button>`).join('')}
           </nav>
+          <div class="mpick">
+            <select class="mpick__select" aria-label="자료 고르기">
+              ${(() => {
+                const opt = (m, k) => `<option value="${k}">${esc(m.title)}${TYPES[m.type] ? ` · ${TYPES[m.type]}` : ''}</option>`;
+                const loose = list.map((m, k) => [m, k]).filter(([m]) => !(m.sub || '').trim());
+                return loose.map(([m, k]) => opt(m, k)).join('') + subs.map((x) => `
+                  <optgroup label="${esc(x)}">${list.map((m, k) => [m, k]).filter(([m]) => (m.sub || '').trim() === x).map(([m, k]) => opt(m, k)).join('')}</optgroup>`).join('');
+              })()}
+            </select>
+            <span class="mpick__count"></span>
+          </div>
         </div>` : ''}
       <section class="pane" aria-live="polite"></section>`;
 
     const pane = body.querySelector('.pane');
     const buttons = [...body.querySelectorAll('.mlist__item')];
+    const picker = body.querySelector('.mpick__select');
+    const pickCount = body.querySelector('.mpick__count');
     let currentK = -1;
     const select = (k) => {
       if (k === currentK) return;
       currentK = k;
       buttons.forEach((b, j) => b.setAttribute('aria-current', j === k ? 'true' : 'false'));
+      if (picker) {
+        picker.value = String(k);
+        pickCount.textContent = `${picker.selectedIndex + 1} / ${list.length}`;
+      }
       cleanup();
       cleanup = () => {};
       const m = list[k];
@@ -421,6 +452,7 @@
       else showPdf(pane, m, my);
     };
     buttons.forEach((b) => b.addEventListener('click', () => select(Number(b.dataset.k))));
+    if (picker) picker.addEventListener('change', () => select(Number(picker.value)));
 
     // 소분류 고르면 목록을 거르고, 보고 있던 자료가 빠지면 첫 자료를 엶
     body.querySelectorAll('.subfilter__btn').forEach((btn) => btn.addEventListener('click', () => {
@@ -593,7 +625,7 @@
           </div>
         </div>
         <div class="pdf__scroll" tabindex="0" aria-label="${esc(m.title)} 미리보기">
-          <div class="pdf__pages"><div class="pdf__sheet is-skeleton"></div></div>
+          <div class="pdf__pages">${LOADING}</div>
         </div>
       </div>`;
 
@@ -637,6 +669,7 @@
         cMapPacked: true,
         standardFontDataUrl: `${PDFJS}standard_fonts/`,
       });
+      progress(task, holder);
       doc = await task.promise;
       if (!alive) return;
       for (let n = 1; n <= doc.numPages; n++) {
