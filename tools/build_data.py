@@ -190,6 +190,10 @@ def web_url(f):
         if not re.match(r"[\w-]+(\.[\w-]+)+(:\d+)?(/|$)", f) or f.lower().endswith(".pdf") and "/" not in f:
             return ""
         f = "https://" + f
+    # 구글 시트·문서·슬라이드 → 창 안에 띄울 수 있는 보기 전용 화면
+    g = re.match(r"https?://docs\.google\.com/(spreadsheets|document|presentation)/d/([\w-]{20,})", f, re.I)
+    if g:
+        return f"https://docs.google.com/{g.group(1)}/d/{g.group(2)}/preview"
     # 한글·공백이 섞인 주소도 브라우저와 똑같이 처리되도록 인코딩 (이미 인코딩된 % 는 그대로)
     return urllib.parse.quote(f, safe=":/?#[]@!$&'()*+,;=%~")
 
@@ -391,7 +395,8 @@ def main():
                 # 웹사이트·웹앱: 자료 창 안에 띄움 (막힌 사이트는 '새 창에서 열기' 카드)
                 if f.lower().startswith("http://"):
                     warnings.append(f"{where}: http:// 주소는 창 안에 띄울 수 없어 새 창으로만 엽니다. https:// 주소를 권합니다.")
-                page_title, embed = probe_web(f)
+                # 구글 문서는 그날만 공유를 열 수도 있어 확인하지 않고 그대로 띄움 (제목은 시트 '제목' 칸)
+                page_title, embed = ("", True) if f.startswith("https://docs.google.com/") else probe_web(f)
                 title = row.get("title") or page_title or row.get("group") or "웹 페이지"
                 m.update(type="web", url=f, embed=embed and f.lower().startswith("https://"))
             elif drive_id(f):
