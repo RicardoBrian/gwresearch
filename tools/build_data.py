@@ -435,10 +435,14 @@ def main():
     for w in warnings:
         print("참고:", w)
     if errors:
-        print(f"\n고칠 것 {len(errors)}개 — 배포하지 않았습니다.")
+        # 한 사람의 실수로 전체 반영이 멈추지 않도록, 문제 있는 행만 빼고 배포
+        # (드라이브 장애 등으로 남는 자료가 하나도 없을 때만 멈춤 → 사이트가 빈 채로 바뀌지 않게)
+        stop = not out and not intros
+        print(f"\n고칠 것 {len(errors)}개 — " + ("자료가 하나도 없어 배포하지 않았습니다." if stop else "이 행들만 빼고 배포합니다."))
         for e in errors:
             print(" -", e)
-        sys.exit(1)
+        if stop:
+            sys.exit(1)
 
     data = {"updated": datetime.date.today().isoformat(), "materials": out, "intros": intros}
     (ROOT / "assets" / "data.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
