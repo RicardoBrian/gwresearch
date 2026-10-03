@@ -334,6 +334,48 @@ def prefetch(rows):
         list(pool.map(lambda j: j[0](j[1]), jobs))
 
 
+def write_report(count, errors, warnings):
+    """반영 결과 페이지(report.html, 사이트 주소/report) — 업로드하는 선생님들이 배포 기록 대신 봄.
+    사이트 어디에도 링크하지 않고 시트 메뉴 [반영 결과 보기]로만 엶. 로그인은 사이트와 같음"""
+    from html import escape
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
+    def block(title, items, cls):
+        if not items:
+            return ""
+        lis = "".join(f"<li>{escape(x)}</li>" for x in items)
+        return f'<h2 class="{cls}">{title} <small>{len(items)}</small></h2><ul>{lis}</ul>'
+    body = (block("고칠 것 — 이 행은 사이트에 반영되지 않았습니다", errors, "bad")
+            + block("참고", warnings, "note")) or '<p class="ok">문제없이 모두 반영했습니다.</p>'
+    (ROOT / "report.html").write_text(f"""<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>반영 결과</title>
+<link rel="icon" href="favicon.ico">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<style>
+  body {{ margin: 0; background: #f6f8f3; color: #1f2a1a; font: 16px/1.6 "Pretendard Variable", Pretendard, system-ui, sans-serif; }}
+  main {{ max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }}
+  h1 {{ margin: 0 0 4px; color: #1f3a8a; font-size: 26px; }}
+  .meta {{ margin: 0 0 24px; color: #5b6655; }}
+  h2 {{ margin: 28px 0 8px; font-size: 18px; }}
+  h2 small {{ color: #5b6655; font-size: 14px; font-weight: 600; }}
+  h2.bad {{ color: #b42318; }}
+  h2.note {{ color: #456d2a; }}
+  ul {{ margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }}
+  li {{ padding: 12px 14px; background: #fff; border: 1px solid #dfe5d8; border-radius: 10px; overflow-wrap: anywhere; }}
+  .ok {{ padding: 16px; background: #fff; border: 1px solid #dfe5d8; border-radius: 10px; color: #456d2a; font-weight: 600; }}
+  .tip {{ margin-top: 32px; color: #5b6655; font-size: 14px; }}
+</style></head>
+<body><main>
+<h1>사이트 반영 결과</h1>
+<p class="meta">마지막 반영: {now.month}월 {now.day}일 {now:%H:%M} · 자료 {count}개 반영</p>
+{body}
+<p class="tip">시트를 고친 뒤 [사이트 반영 → 지금 사이트에 반영하기]를 누르고, 2~3분 뒤 이 페이지를 새로고침해 확인해 주세요.</p>
+</main></body></html>
+""", encoding="utf-8")
+
+
 def main():
     roadmap = load_roadmap()
     ids = [i for i, _, _ in roadmap]
@@ -478,6 +520,7 @@ def main():
             print(" -", e)
         if stop:
             sys.exit(1)
+    write_report(len(out), errors, warnings)
 
     data = {"updated": datetime.date.today().isoformat(), "materials": out, "intros": intros}
     (ROOT / "assets" / "data.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

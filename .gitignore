@@ -3,3 +3,6 @@ assets/docs/drive/
 
 __pycache__/
 .wrangler/
+
+# 배포 때 만드는 반영 결과 페이지
+report.html
