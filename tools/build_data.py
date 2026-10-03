@@ -19,13 +19,14 @@
 
 드라이브 PDF 는 배포 때 앞부분만 확인하고(PDF 여부·공유·파일 이름), 파일은 올리지 않는다.
 방문자가 열 때 Cloudflare 함수(functions/pdf/[id].js)가 드라이브에서 가져와 1시간 캐시한다.
-문제가 있으면 행 번호와 함께 한국어로 알려주고 실패(종료 코드 1)해서
-잘못된 내용이 배포되지 않게 한다. 파일·유튜브가 둘 다 빈 줄(입력 중)은 건너뛴다.
+링크 확인은 8개씩 동시에 한다. 문제가 있는 행은 행 번호와 함께 한국어로 알려주고 빼고 배포한다
+(남는 자료가 하나도 없을 때만 실패). 파일·유튜브가 둘 다 빈 줄(입력 중)은 건너뛴다.
 
 사용법: python3 tools/build_data.py
 """
 import csv
 import datetime
+import functools
 import io
 import json
 import os
@@ -124,6 +125,7 @@ def youtube_id(v):
     return m.group(1) if m else ""
 
 
+@functools.lru_cache(maxsize=None)
 def youtube_title(vid):
     url = "https://www.youtube.com/oembed?format=json&url=" + urllib.parse.quote(f"https://www.youtube.com/watch?v={vid}")
     try:
@@ -142,13 +144,21 @@ def natural_key(name):
     return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", name)]
 
 
-def list_folder(fid, errors, warnings, where):
-    """공개 드라이브 폴더 안의 PDF 목록 [(파일id, 이름)] — 이름순(01_, 02_ … 순서 지정 가능)"""
+@functools.lru_cache(maxsize=None)
+def folder_html(fid):
+    """(폴더 페이지 html, 오류)"""
     url = f"https://drive.google.com/embeddedfolderview?id={fid}"
     try:
         with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60) as r:
-            html = r.read().decode("utf-8", "replace")
+            return r.read().decode("utf-8", "replace"), ""
     except Exception as e:  # noqa: BLE001
+        return "", str(e) or "접속 실패"
+
+
+def list_folder(fid, errors, warnings, where):
+    """공개 드라이브 폴더 안의 PDF 목록 [(파일id, 이름)] — 이름순(01_, 02_ … 순서 지정 가능)"""
+    html, e = folder_html(fid)
+    if e:
         errors.append(f"{where}: 드라이브 폴더를 읽지 못했습니다 ({e}). 폴더 공유가 "
                       "'링크가 있는 모든 사용자'인지 확인해 주세요.")
         return None
@@ -198,6 +208,7 @@ def web_url(f):
     return urllib.parse.quote(f, safe=":/?#[]@!$&'()*+,;=%~")
 
 
+@functools.lru_cache(maxsize=None)
 def probe_web(url):
     """웹 페이지 제목과, 다른 사이트 창 안에 띄우기를 허용하는지 (X-Frame-Options / frame-ancestors)"""
     try:
@@ -301,6 +312,28 @@ def intro_file(f, errors, warnings, where):
     return None
 
 
+def prefetch(rows):
+    """링크 확인(드라이브·폴더·웹·유튜브 제목)을 8개씩 동시에 미리 해 둠.
+    결과는 캐시에 남고, 아래 본 처리는 같은 순서·같은 규칙으로 그 결과를 씀 (검사 내용은 그대로, 시간만 줄임)"""
+    jobs, folders = [], []
+    for row in rows:
+        f, yt = row.get("file", ""), row.get("youtube", "")
+        for v in (f, yt):
+            if drive_id(v):
+                jobs.append((probe_drive, drive_id(v)))
+        if folder_id(f):
+            folders.append(folder_id(f))
+        elif web_url(f) and not web_url(f).startswith("https://docs.google.com/"):
+            jobs.append((probe_web, web_url(f)))
+        if yt and not drive_id(yt) and youtube_id(yt) and not row.get("title"):
+            jobs.append((youtube_title, youtube_id(yt)))
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(folder_html, folders))
+        for fid in folders:  # 폴더 안 파일들도
+            jobs += [(probe_drive, x) for x, _ in list_folder(fid, [], [], "") or []]
+        list(pool.map(lambda j: j[0](j[1]), jobs))
+
+
 def main():
     roadmap = load_roadmap()
     ids = [i for i, _, _ in roadmap]
@@ -310,7 +343,9 @@ def main():
 
     stage_names = list(dict.fromkeys(s for _, _, s in roadmap))
     errors, warnings, out, intros = [], [], [], {}
-    for n, row in enumerate(read_rows(), start=2):  # 시트 기준 행 번호 (1행은 제목)
+    rows = read_rows()
+    prefetch(rows)
+    for n, row in enumerate(rows, start=2):  # 시트 기준 행 번호 (1행은 제목)
         if not any(row.values()):
             continue
         where = f"{n}행({row.get('title') or row.get('item') or '제목 없음'})"
