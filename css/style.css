@@ -346,6 +346,26 @@ a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transpar
 }
 
 /* 터치 기기(마우스 없음): hover 로 알려줄 수 없으니 화살표를 항상 표시 */
+/* 오른쪽 아래 작은 표시 */
+.copy {
+  color: #8a8f86;
+  font-size: 13px;
+  text-align: right;
+}
+
+@media (min-width: 1024px) {
+  .copy {
+    position: absolute;
+    right: calc(40 * var(--u));
+    bottom: calc(28 * var(--u));
+    font-size: max(12px, calc(17 * var(--u)));
+  }
+}
+
+@media (max-width: 1023.98px) {
+  .copy { padding: 8px 16px 24px; }
+}
+
 @media (hover: none) {
   .item::after {
     opacity: .45;
