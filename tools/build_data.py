@@ -210,19 +210,33 @@ def web_url(f):
 
 @functools.lru_cache(maxsize=None)
 def probe_web(url):
-    """웹 페이지 제목과, 다른 사이트 창 안에 띄우기를 허용하는지 (X-Frame-Options / frame-ancestors)"""
+    """웹 페이지 (제목, 창 안에 띄우기 허용 여부, 대표 이미지 주소)
+    - 띄우기: X-Frame-Options / frame-ancestors
+    - 대표 이미지: og:image / twitter:image (카톡에 링크 보낼 때 뜨는 그림). 없으면 '' """
     try:
         with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=20) as r:
             xfo = (r.headers.get("X-Frame-Options") or "").lower()
             csp = (r.headers.get("Content-Security-Policy") or "").lower()
             html = r.read(300_000).decode("utf-8", "replace")
+            final = r.geturl()
     except Exception:  # noqa: BLE001  (확인 못 하면 일단 띄워 봄)
-        return "", True
+        return "", True, ""
     m = re.search(r"<title[^>]*>(.*?)</title>", html, re.S | re.I)
     title = html_unescape(m.group(1)).strip() if m else ""
     fa = re.search(r"frame-ancestors([^;]*)", csp)
     blocked = xfo in ("deny", "sameorigin") or (fa and "*" not in fa.group(1) and "https:" not in fa.group(1))
-    return title, not blocked
+    return title, not blocked, meta_image(html, final)
+
+
+def meta_image(html, base):
+    for tag in re.findall(r"<meta\b[^>]*>", html, re.I):
+        if re.search(r"""(?:property|name)\s*=\s*["'](?:og:image|og:image:url|twitter:image)["']""", tag, re.I):
+            m = re.search(r"""content\s*=\s*["']([^"']+)["']""", tag, re.I)
+            if m:
+                url = urllib.parse.urljoin(base, html_unescape(m.group(1)).strip())
+                if url.startswith("https://"):
+                    return url
+    return ""
 
 
 def drive_id(v):
@@ -474,9 +488,16 @@ def main():
                 if f.lower().startswith("http://"):
                     warnings.append(f"{where}: http:// 주소는 창 안에 띄울 수 없어 새 창으로만 엽니다. https:// 주소를 권합니다.")
                 # 구글 문서는 그날만 공유를 열 수도 있어 확인하지 않고 그대로 띄움 (제목은 시트 '제목' 칸)
-                page_title, embed = ("", True) if f.startswith("https://docs.google.com/") else probe_web(f)
+                gdoc = re.match(r"https://docs\.google\.com/\w+/d/([\w-]+)", f)
+                if gdoc:
+                    # 드라이브 미리보기 그림 (공유가 꺼져 있으면 사이트에서 기본 그림으로 대신함)
+                    page_title, embed, image = "", True, f"https://drive.google.com/thumbnail?id={gdoc.group(1)}&sz=w800"
+                else:
+                    page_title, embed, image = probe_web(f)
                 title = row.get("title") or page_title or row.get("group") or "웹 페이지"
                 m.update(type="web", url=f, embed=embed and f.lower().startswith("https://"))
+                if image:
+                    m["image"] = image
             elif drive_id(f):
                 is_pdf, fname, err = probe_drive(drive_id(f))
                 if err:

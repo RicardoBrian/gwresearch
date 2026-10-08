@@ -114,14 +114,16 @@
   };
 
   // ---- 주소(해시) ↔ 창 ----
-  // #stage-N, #항목id, #항목id/분류
+  // #stage-N, #항목id, #항목id/분류, 웹앱 썸네일에서 고른 자료는 끝에 /번호 (#항목id/2, #항목id/분류/2)
   function routeOf(hash) {
-    const raw = hash.replace(/^#/, '');
-    const [id, g] = raw.split('/');
+    const parts = hash.replace(/^#/, '').split('/');
+    const pick = parts.length > 1 && /^\d+$/.test(parts[parts.length - 1]) ? Number(parts.pop()) : 0;
+    const [id, g] = parts;
     const group = g ? decodeURIComponent(g) : null;
-    if (!group && stageById.has(id)) return { kind: 'stage', stage: stageById.get(id), path: id };
+    if (!group && !pick && stageById.has(id)) return { kind: 'stage', stage: stageById.get(id), path: id };
     if (itemById.has(id)) {
-      return { kind: 'item', item: itemById.get(id), group, path: group ? groupPath(itemById.get(id), group) : id };
+      const base = group ? groupPath(itemById.get(id), group) : id;
+      return { kind: 'item', item: itemById.get(id), group, pick, base, path: pick ? `${base}/${pick}` : base };
     }
     return null;
   }
@@ -208,7 +210,7 @@
 
     openDialog();
     if (route.kind === 'stage') renderStage(route.stage);
-    else renderItem(route.item, route.group, my);
+    else renderItem(route, my);
   }
 
   // 머리글: [위치 표시 / 제목]  ……  [닫기]
@@ -354,7 +356,7 @@
   }
 
   // ---- 항목 자료 ----
-  async function renderItem(item, group, my) {
+  async function renderItem({ item, group, pick, base }, my) {
     const stage = item.stage;
     const stageLink = `<a class="viewer__back" href="#${stage.id}" data-replace><span class="badge">${stage.n}</span><span>${esc(stage.name)}</span></a>`;
 
@@ -377,8 +379,21 @@
       ? `${stageLink}<span class="viewer__sep" aria-hidden="true">›</span><a class="viewer__crumbitem" href="#${esc(item.id)}" data-replace>${esc(item.title)}</a>`
       : stageLink;
 
+    // 웹앱만 2개 이상이면 썸네일 카드부터 (고르면 #…/번호 로 들어가 지금처럼 창 안에서 엶)
+    const title = current ? current.name : item.title;
+    const webs = list.filter((m) => m.type !== 'intro');
+    if (!loadFailed && webs.length > 1 && webs.every((m) => m.type === 'web')) {
+      if (!pick || !list[pick - 1]) {
+        renderGallery({ item, stage, title, crumb, list, base, intro: list[0].type === 'intro' ? list[0].file : '' });
+        return;
+      }
+    }
     mount(`
-      ${head({ stage, title: current ? current.name : item.title, crumb })}
+      ${head({
+        stage,
+        title,
+        crumb: pick ? `${crumb}<span class="viewer__sep" aria-hidden="true">›</span><a class="viewer__crumbitem" href="#${esc(base)}" data-replace>전체 보기</a>` : crumb,
+      })}
       <div class="viewer__body"></div>`);
     const body = dialog.querySelector('.viewer__body');
 
@@ -462,7 +477,37 @@
       const visible = buttons.filter((b) => !b.hidden);
       if (visible.length && buttons[currentK].hidden) select(Number(visible[0].dataset.k));
     }));
-    select(0);
+    select(pick && list[pick - 1] ? pick - 1 : 0);
+  }
+
+  // ---- 웹앱 썸네일 카드 (대표 이미지가 없거나 안 열리면 아이콘과 사이트 주소) ----
+  function renderGallery({ item, stage, title, crumb, list, base, intro }) {
+    const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+    const cards = list.map((m, k) => m.type !== 'web' ? '' : `
+      <li><a class="tcard" href="#${esc(base)}/${k + 1}">
+        <span class="tcard__thumb">
+          <span class="tcard__ph">${ICON.web}<span>${esc(host(m.url))}</span></span>
+          ${m.image ? `<img src="${esc(m.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}
+        </span>
+        <span class="tcard__body">
+          <span class="tcard__title">${esc(m.title)}</span>
+          ${m.desc ? `<span class="tcard__desc">${esc(m.desc)}</span>` : ''}
+        </span>
+      </a></li>`).join('');
+    mount(`
+      ${head({ stage, title, crumb })}
+      <div class="viewer__body viewer__body--stage${intro ? ' has-intro' : ''}">
+        ${intro ? introMarkup(item.title) : ''}
+        <ul class="tcards">${cards}</ul>
+      </div>`);
+    // 그림이 안 열리면(공유 꺼짐·주소 바뀜) 뒤의 기본 그림이 보이게
+    dialog.querySelectorAll('.tcard__thumb img').forEach((img) => {
+      const drop = () => img.remove();
+      img.addEventListener('error', drop);
+      // 드라이브 미리보기는 권한이 없으면 아주 작은 빈 그림이 올 때가 있음
+      img.addEventListener('load', () => { if (img.naturalWidth < 40) drop(); });
+    });
+    if (intro) showIntro(dialog.querySelector('.intro'), intro);
   }
 
   // ---- 분류 카드 (단계 개요와 같은 모양) ----

@@ -829,6 +829,89 @@ html.has-modal { overflow: hidden; }
 .card:active { background: var(--green-soft); }
 .card:focus-visible .card__arrow { background: var(--green); color: #fff; }
 
+/* ---------- 웹앱 썸네일 카드 ---------- */
+.tcards {
+  display: grid;
+  align-content: start;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.viewer__body--stage.has-intro .tcards { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+
+.tcard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  transition: border-color .2s, transform .3s var(--ease), box-shadow .3s var(--ease);
+}
+
+.tcard__thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 1.91 / 1; /* 대표 이미지 표준 비율 */
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(135deg, var(--green-soft), #f6f9f1);
+}
+
+.tcard__thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #fff;
+}
+
+.tcard__ph {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tcard__ph svg { width: 40px; height: 40px; }
+.tcard__ph span { color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.tcard__body { display: grid; gap: 4px; padding: 14px 16px 16px; }
+
+.tcard__title {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+}
+
+.tcard__desc {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+@media (hover: hover) {
+  .tcard:hover {
+    border-color: rgba(69, 109, 42, .45);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 24px rgba(40, 60, 20, .1);
+  }
+}
+
+.tcard:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
 /* ---------- 상태 (불러오는 중 / 준비 중 / 오류) ---------- */
 .state {
   display: grid;
@@ -1025,6 +1108,11 @@ html.has-modal { overflow: hidden; }
   .intro-pane { padding: 12px; }
   .cards { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .card { min-height: 0; padding: 16px 56px 16px 16px; }
+  .tcards, .viewer__body--stage.has-intro .tcards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .tcard { border-radius: 14px; }
+  .tcard__body { padding: 10px 12px 12px; }
+  .tcard__title { font-size: 15px; }
+  .tcard__desc { font-size: 13px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
