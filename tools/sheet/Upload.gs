@@ -7,7 +7,7 @@
  * - 시트가 그대로 저장소. 앱은 시트 '자료' 탭에 사람이 넣는 것과 같은 형식으로 쓰고 읽음
  * - 파일은 이 스크립트 주인 드라이브의 '연구학교 자료/단계/항목/(분류)' 폴더에 저장하고 공유를 엶
  * - 중간에 실패하면 만든 파일을 휴지통으로 보내고 시트는 건드리지 않음
- * - 바뀐 게 있으면 1분 뒤 사이트 반영 (여러 번 바꿔도 한 번만)
+ * - 사이트 반영은 앱의 [사이트에 반영하기] 버튼으로 모아서 한 번에
  */
 var ROOT_NAME = '연구학교 자료';
 var DATA_SHEET = '자료';
@@ -46,6 +46,8 @@ function api(code, action, p) {
     case 'remove': return remove_(p);
     case 'fix': return fix_(p);
     case 'expand': return expand_(p);
+    case 'state': return deployState_();
+    case 'deploy': return deployNow_();
   }
   throw new Error('알 수 없는 요청입니다.');
 }
@@ -340,27 +342,41 @@ function blob_(file, wantPdf) {
 }
 
 // =========================================================
-// 사이트 반영: 1분 뒤 한 번 (그 사이 여러 번 바꿔도 한 번만)
+// 사이트 반영: 앱의 [사이트에 반영하기]를 눌렀을 때만 (올릴 때마다 배포하지 않음)
+// 바뀐 게 있으면 DIRTY_COUNT 를 올려 두고, 버튼을 누르면 한 번 배포
 // =========================================================
-function scheduleDeploy_() {
-  const has = ScriptApp.getProjectTriggers().some((t) => t.getHandlerFunction() === 'runScheduledDeploy');
-  if (!has) ScriptApp.newTrigger('runScheduledDeploy').timeBased().after(60 * 1000).create();
+function markDirty_() {
+  const p = props_();
+  p.setProperty('DIRTY_COUNT', String(Number(p.getProperty('DIRTY_COUNT') || 0) + 1));
 }
 
+function deployNow_() {
+  if (!/^https:\/\/api\.cloudflare\.com\//.test(DEPLOY_HOOK)) {
+    throw new Error('배포 후크 주소가 없습니다. Code.gs 맨 위 DEPLOY_HOOK 를 확인해 주세요.');
+  }
+  const p = props_();
+  const last = Number(p.getProperty('LAST_DEPLOY_AT') || 0);
+  if (Date.now() - last < 60 * 1000) return deployState_(); // 1분 안에 또 누르면 한 번만
+  const res = UrlFetchApp.fetch(DEPLOY_HOOK, { method: 'post', muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) {
+    throw new Error(`사이트 반영 요청이 실패했습니다 (${res.getResponseCode()}). 잠시 뒤 다시 눌러 주세요.`);
+  }
+  p.setProperties({ LAST_DEPLOY_AT: String(Date.now()), DIRTY_COUNT: '0' });
+  return deployState_();
+}
+
+// 예전 버전(1분 뒤 자동 반영)이 만들어 둔 예약이 남아 있으면 정리만 함
 function runScheduledDeploy() {
   ScriptApp.getProjectTriggers()
     .filter((t) => t.getHandlerFunction() === 'runScheduledDeploy')
     .forEach((t) => ScriptApp.deleteTrigger(t));
-  if (!/^https:\/\/api\.cloudflare\.com\//.test(DEPLOY_HOOK)) return; // 테스트용 사본 등 후크 주소가 없을 때
-  const res = UrlFetchApp.fetch(DEPLOY_HOOK, { method: 'post', muteHttpExceptions: true });
-  if (res.getResponseCode() === 200) props_().setProperty('LAST_DEPLOY_AT', String(Date.now()));
 }
 
+// {lastDeploy: 마지막 반영 시각, dirty: 반영 안 된 변경 수, building: 반영 중(3분)}
 function deployState_() {
-  return {
-    lastDeploy: Number(props_().getProperty('LAST_DEPLOY_AT') || 0),
-    pending: ScriptApp.getProjectTriggers().some((t) => t.getHandlerFunction() === 'runScheduledDeploy'),
-  };
+  const p = props_();
+  const last = Number(p.getProperty('LAST_DEPLOY_AT') || 0);
+  return { lastDeploy: last, dirty: Number(p.getProperty('DIRTY_COUNT') || 0), building: Date.now() - last < 3 * 60 * 1000 };
 }
 
 // =========================================================
@@ -549,7 +565,7 @@ function upload_(p) {
     made.forEach((f) => { try { f.setTrashed(true); } catch (_) { /* 이미 없음 */ } });
     throw e;
   }
-  scheduleDeploy_();
+  markDirty_();
   return { ok: true };
 }
 
@@ -618,7 +634,7 @@ function update_(p) {
   }
   trash.forEach((f) => { try { f.setTrashed(true); } catch (_) { /* 이미 없음 */ } });
   check_([p.uid]);
-  scheduleDeploy_();
+  markDirty_();
   return { ok: true };
 }
 
@@ -635,7 +651,7 @@ function remove_(uid) {
     const f = openFile_(id);
     if (f && inRoot_(f)) f.setTrashed(true);
   });
-  scheduleDeploy_();
+  markDirty_();
   return { ok: true };
 }
 
@@ -660,7 +676,7 @@ function fix_(p) {
     else publish_(x);
     withLock_(() => writeRow_(t, findRow_(t, p.uid), { at: new Date() }));
   }
-  scheduleDeploy_();
+  markDirty_();
   return check_([p.uid])[p.uid];
 }
 
@@ -767,7 +783,7 @@ function migrateRun(uids) {
 
 function migrateFinish() {
   ownerOnly_();
-  scheduleDeploy_();
+  markDirty_();
 }
 
 // 되돌리기: '이전 링크'를 다시 링크 칸으로 (복사한 파일은 드라이브에 그대로 남음)
@@ -786,6 +802,6 @@ function migrateUndo() {
       n++;
     });
   });
-  if (n) scheduleDeploy_();
+  if (n) markDirty_();
   return n;
 }

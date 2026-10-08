@@ -18,7 +18,11 @@
   header { position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 1px solid var(--line); }
   .bar { max-width: 960px; margin: 0 auto; padding: 14px 16px 0; }
   h1 { margin: 0 0 10px; color: var(--navy); font-size: 21px; letter-spacing: -0.02em; }
+  .tabrow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
   .tabs { display: flex; gap: 4px; }
+  .ship { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; margin-bottom: 6px; border-radius: 999px; background: var(--paper); color: var(--muted); font-size: 14px; font-weight: 600; }
+  .ship.is-dirty { background: var(--wait-soft); color: var(--wait); }
+  .ship .btn:disabled { opacity: .4; }
   .tab { padding: 10px 16px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted); font-weight: 700; cursor: pointer; }
   .tab[aria-selected="true"] { color: var(--green); border-bottom-color: var(--green); }
 
@@ -67,7 +71,7 @@
   .deploy { margin-left: auto; color: var(--muted); font-size: 13px; }
   /* 목록: 왼쪽 목차(따라다님) + 오른쪽 자료 */
   .listgrid { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 20px; align-items: start; }
-  .toc { position: sticky; top: 112px; max-height: calc(100vh - 130px); overflow: auto; padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
+  .toc { position: sticky; top: calc(var(--head, 104px) + 10px); max-height: calc(100vh - var(--head, 104px) - 26px); overflow: auto; padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
   .toc__stage { margin: 10px 6px 4px; color: var(--navy); font-size: 13px; font-weight: 800; }
   .toc__stage:first-child { margin-top: 2px; }
   .toc__item { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; color: var(--ink); text-decoration: none; font-size: 14px; line-height: 1.35; }
@@ -82,18 +86,18 @@
   .dot.is-check { background: var(--line); }
   .dot.is-empty { background: none; box-shadow: inset 0 0 0 2px #b8c2b0; }
   .toc-sel { display: none; }
-  .stage { margin: 22px 0 8px; color: var(--navy); font-size: 18px; scroll-margin-top: 120px; }
+  .stage { margin: 22px 0 8px; color: var(--navy); font-size: 18px; scroll-margin-top: calc(var(--head, 104px) + 16px); }
   .stage:first-child { margin-top: 0; }
-  .item { margin-bottom: 10px; background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; scroll-margin-top: 120px; transition: box-shadow .4s; }
+  .item { margin-bottom: 10px; background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; scroll-margin-top: calc(var(--head, 104px) + 16px); transition: box-shadow .4s; }
   .item.is-flash { box-shadow: 0 0 0 3px var(--green); }
   .item__head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 10px 14px; background: #fbfcf9; border-bottom: 1px solid var(--line); font-weight: 700; }
   .item__tally { display: flex; gap: 10px; color: var(--muted); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
   @media (max-width: 860px) {
     .listgrid { grid-template-columns: 1fr; }
-    .toc { position: sticky; top: 100px; z-index: 4; max-height: none; overflow: visible; padding: 8px; }
+    .toc { position: sticky; top: var(--head, 104px); z-index: 4; max-height: none; overflow: visible; padding: 8px; }
     .toc__list { display: none; }
     .toc-sel { display: block; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-weight: 600; }
-    .stage, .item { scroll-margin-top: 170px; }
+    .stage, .item { scroll-margin-top: calc(var(--head, 104px) + 76px); }
   }
   @media (prefers-reduced-motion: reduce) { .item { transition: none; } }
   .item__empty { padding: 10px 14px; color: var(--muted); font-size: 14px; }
@@ -131,10 +135,16 @@
 <header>
   <div class="bar">
     <h1>연구학교 자료 올리기</h1>
-    <nav class="tabs" role="tablist" hidden>
-      <button class="tab" role="tab" data-tab="up" aria-selected="true">올리기</button>
-      <button class="tab" role="tab" data-tab="list" aria-selected="false">자료 목록</button>
-    </nav>
+    <div class="tabrow">
+      <nav class="tabs" role="tablist" hidden>
+        <button class="tab" role="tab" data-tab="up" aria-selected="true">올리기</button>
+        <button class="tab" role="tab" data-tab="list" aria-selected="false">자료 목록</button>
+      </nav>
+      <div class="ship" id="ship" hidden>
+        <span id="shipText" aria-live="polite"></span>
+        <button class="btn btn--solid btn--sm" id="shipBtn" type="button">사이트에 반영하기</button>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -153,7 +163,7 @@
 
   <!-- 올리기 -->
   <section id="up" hidden>
-    <p class="note">올리면 파일 정리·공유 설정·시트 입력이 자동으로 되고, <b>약 1분 뒤 사이트에 반영</b>돼요. (반영까지 2~3분)</p>
+    <p class="note">올리면 파일 정리·공유 설정·시트 입력이 자동으로 돼요. 다 올린 뒤 위의 <b>[사이트에 반영하기]</b>를 한 번 누르면 2~3분 뒤 사이트에 보여요.</p>
     <form id="upForm" class="panel" novalidate>
       <div class="row2">
         <label class="field"><span>단계</span><select id="stage" required></select></label>
@@ -301,6 +311,7 @@
       $('by').value = store.get('uploader');
       syncItems(); syncKind();
       openTab('up');
+      refreshShip();
     } catch (e) {
       if (!$('login').hidden) return;
       $('loading').innerHTML = `<div>${esc(e.message)}</div><button class="btn" onclick="location.reload()">다시 시도</button>`;
@@ -468,7 +479,7 @@
           files = files.filter((_, i) => !result[i].ok);
           if (src() === 'link') $('links').value = files.map((f) => f.link).join('\n');
         } else {
-          toast(`${files.length}개 올렸어요. 약 1분 뒤 사이트에 반영돼요.`);
+          toast(`${files.length}개 올렸어요. 다 올리면 [사이트에 반영하기]를 눌러 주세요.`); changed(files.length);
           files = []; $('links').value = ''; resetText();
         }
       } else {
@@ -480,7 +491,7 @@
           p.thumb = await readFile(t);
         }
         await call('upload', p);
-        toast('올렸어요. 약 1분 뒤 사이트에 반영돼요.');
+        toast('올렸어요. 다 올리면 [사이트에 반영하기]를 눌러 주세요.'); changed(1);
         resetText();
       }
       data = null;
@@ -499,6 +510,42 @@
 
   let onlyBad = false;
 
+  /* 머리글 높이(버튼 줄 때문에 화면마다 다름) → 목차·이동 위치 기준 */
+  const setHead = () => document.documentElement.style.setProperty('--head', `${document.querySelector('header').offsetHeight}px`);
+  new ResizeObserver(setHead).observe(document.querySelector('header'));
+
+  /* ---- 사이트 반영 버튼: 바뀐 걸 모아서 한 번에 배포 ---- */
+  let dep = { lastDeploy: 0, dirty: 0, building: false };
+  function drawShip() {
+    const b = $('shipBtn');
+    let text;
+    if (dep.building) { text = '사이트 반영 중… 2~3분 뒤 보여요'; b.disabled = true; }
+    else if (dep.dirty) { text = `반영 안 된 변경 ${dep.dirty}건`; b.disabled = false; }
+    else { text = '사이트에 모두 반영됨'; b.disabled = true; }
+    $('shipText').textContent = text;
+    $('ship').classList.toggle('is-dirty', !!dep.dirty && !dep.building);
+    $('ship').hidden = false;
+  }
+  function changed(n) { dep.dirty += n; dep.building = false; drawShip(); }
+  async function refreshShip() {
+    try { dep = await call('state'); drawShip(); } catch (e) { /* 다음에 */ }
+  }
+  $('shipBtn').addEventListener('click', async () => {
+    const b = $('shipBtn');
+    b.disabled = true; b.textContent = '반영 요청 중…';
+    try {
+      dep = await call('deploy');
+      toast('사이트 반영을 시작했어요. 2~3분 뒤 사이트에 보여요.');
+      setTimeout(refreshShip, 3 * 60 * 1000 + 3000);
+    } catch (e) {
+      toast(e.message);
+    } finally {
+      b.textContent = '사이트에 반영하기';
+      drawShip();
+      if (data && !$('list').hidden) drawList();
+    }
+  });
+
   /* 목록은 지난번 것을 바로 보여 주고(기기에 저장), 뒤에서 조용히 새로 받아 바꿈.
      점검은 서버에 저장된 결과(30분마다 자동 점검)를 쓰고, 30분이 지난 줄만 다시 점검 */
   const FRESH = 30 * 60 * 1000;
@@ -506,6 +553,7 @@
 
   function useList(d) {
     data = d;
+    if (d.deploy) { dep = d.deploy; drawShip(); }
     lists = d.stages;
     status = {};
     d.rows.forEach((r) => { if (r.st) status[r.uid] = r.st; });
@@ -550,7 +598,7 @@
     if (!s) return { icon: ICON.check, cls: 'is-check' };
     if (s.s === 'bad') return { icon: ICON.bad, cls: 'is-bad', why: s.why, fix: s.fix };
     if (s.s === 'warn') return { icon: ICON.warn, cls: 'is-warn', why: s.why, fix: s.fix };
-    if (data.deploy && r.at > data.deploy.lastDeploy) return { icon: ICON.wait, cls: 'is-wait', why: '사이트 반영 대기 중 (곧 자동 반영)' };
+    if (r.at > dep.lastDeploy) return { icon: ICON.wait, cls: 'is-wait', why: '사이트 반영 전 (위의 [사이트에 반영하기]를 누르면 반영돼요)' };
     return { icon: ICON.ok, cls: 'is-ok' };
   }
 
@@ -593,9 +641,7 @@
       cnt[k]++;
     });
     const empty = lists.reduce((n, s) => n + s.items.filter((it) => !rows.some((r) => r.item === it)).length, 0);
-    const dep = data.deploy || {};
-    const depText = dep.pending ? '사이트 반영 예정 (1분 안)'
-      : dep.lastDeploy ? `마지막 자동 반영 ${new Date(dep.lastDeploy).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '';
+    const depText = dep.lastDeploy ? `마지막 사이트 반영 ${new Date(dep.lastDeploy).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '';
     $('summary').innerHTML = `
       <button class="chip" id="fBad" aria-pressed="${onlyBad}">고칠 것만 보기</button>
       <span>전체 ${rows.length} · ${ICON.ok} ${cnt.ok} · ${ICON.bad} ${cnt.bad} · ${ICON.warn} ${cnt.warn} · ${ICON.wait} ${cnt.wait}${cnt.check ? ` · 점검 중 ${cnt.check}` : ''} · 자료 없는 항목 ${empty}</span>
@@ -676,7 +722,8 @@
     $('toc').querySelectorAll('.toc__item').forEach((a) => a.classList.toggle('is-here', a.dataset.go === id));
   }
   function watchToc() {
-    const line = matchMedia('(max-width: 860px)').matches ? 180 : 130;
+    const head = document.querySelector('header').offsetHeight;
+    const line = head + (matchMedia('(max-width: 860px)').matches ? 80 : 26);
     let cur = '';
     $('tree').querySelectorAll('.item').forEach((el) => { if (el.getBoundingClientRect().top <= line) cur = el.id; });
     markHere(cur);
@@ -698,7 +745,7 @@
         try {
           status[r.uid] = await call('fix', { uid: r.uid, fix: fx.dataset.fix });
           r.at = Date.now();
-          toast('고쳤어요. 약 1분 뒤 사이트에 반영돼요.');
+          toast('고쳤어요. [사이트에 반영하기]를 누르면 사이트에도 반영돼요.'); changed(1);
           drawList();
         } catch (e) { toast(e.message); fx.disabled = false; }
       };
@@ -735,7 +782,7 @@
     try {
       await call('remove', r.uid);
       data.rows = data.rows.filter((x) => x !== r);
-      toast('삭제했어요. 약 1분 뒤 사이트에 반영돼요.');
+      toast('삭제했어요. [사이트에 반영하기]를 누르면 사이트에서도 빠져요.'); changed(1);
       drawList();
     } catch (e) { toast(e.message); }
   }
@@ -793,7 +840,7 @@
       else if ($('eThumbDrop').checked) p.dropThumb = true;
       await call('update', p);
       $('edit').close();
-      toast('저장했어요. 약 1분 뒤 사이트에 반영돼요.');
+      toast('저장했어요. [사이트에 반영하기]를 누르면 사이트에도 반영돼요.'); changed(1);
       loadList();
     } catch (err) {
       fail('editErr', err.message);
