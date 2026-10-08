@@ -496,7 +496,8 @@ def main():
                     page_title, embed, image = "", True, f"https://drive.google.com/thumbnail?id={gdoc.group(1)}&sz=w800"
                 else:
                     page_title, embed, image = probe_web(f)
-                title = row.get("title") or page_title or row.get("group") or "웹 페이지"
+                # 제목 칸이 비면 사이트 제목 → 사이트 주소(분류 이름을 제목으로 쓰면 '웹' 같은 카드가 여러 개 생김)
+                title = row.get("title") or page_title or urllib.parse.urlsplit(f).hostname or "웹 페이지"
                 m.update(type="web", url=f, embed=embed and f.lower().startswith("https://"))
                 # 시트 '썸네일' 칸(드라이브 그림 파일 또는 그림 주소)이 있으면 그것을 먼저
                 thumb = row.get("thumb", "")

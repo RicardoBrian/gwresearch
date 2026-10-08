@@ -611,7 +611,7 @@
         <div class="pdf">
           <div class="pdf__bar">
             <div class="pdf__name"><div class="pdf__nameline"><h3 class="pane__title">${esc(m.title)}</h3></div>
-              ${m.desc ? `<p class="pdf__desc" title="${esc(m.desc)}">${esc(m.desc)}</p>` : ''}</div>
+              <p class="pdf__desc">${m.desc ? `${esc(m.desc)} · ` : ''}화면이 안 보이면 [새 창에서 열기]를 눌러 주세요</p></div>
             <div class="pdf__tools">
               <button class="icon-btn web-home" type="button" aria-label="처음 화면" title="처음 화면">${ICON.home}</button>
               <button class="icon-btn web-full" type="button" aria-label="전체 화면" title="전체 화면">${ICON.full}</button>
