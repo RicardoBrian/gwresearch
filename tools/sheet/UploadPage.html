@@ -447,12 +447,15 @@
 
   function stateOf(r) {
     const s = status[r.uid];
-    if (!s) return { icon: '⋯', cls: 'is-check' };
-    if (s.s === 'bad') return { icon: '⚠️', cls: 'is-bad', why: s.why, fix: s.fix };
-    if (s.s === 'warn') return { icon: '🟡', cls: 'is-warn', why: s.why, fix: s.fix };
-    if (data.deploy && r.at > data.deploy.lastDeploy) return { icon: '⏳', cls: 'is-wait', why: '사이트 반영 대기 중 (곧 자동 반영)' };
-    return { icon: '✅', cls: 'is-ok' };
+    if (!s) return { icon: ICON.check, cls: 'is-check' };
+    if (s.s === 'bad') return { icon: ICON.bad, cls: 'is-bad', why: s.why, fix: s.fix };
+    if (s.s === 'warn') return { icon: ICON.warn, cls: 'is-warn', why: s.why, fix: s.fix };
+    if (data.deploy && r.at > data.deploy.lastDeploy) return { icon: ICON.wait, cls: 'is-wait', why: '사이트 반영 대기 중 (곧 자동 반영)' };
+    return { icon: ICON.ok, cls: 'is-ok' };
   }
+
+  // 기호는 \u 로 (앱스스크립트 화면에서 특수 문자가 깨지지 않게)
+  const ICON = { ok: '\u2705', bad: '\u26A0\uFE0F', warn: '\u2757', wait: '\u23F3', check: '\u22EF', none: '\u25CB' };
 
   const FIX = { share: '공유 열기', 'share-thumb': '썸네일 공유 열기', restore: '휴지통에서 꺼내기', unhide: '주소로 바꾸기' };
 
@@ -488,7 +491,7 @@
       : dep.lastDeploy ? `마지막 자동 반영 ${new Date(dep.lastDeploy).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '';
     $('summary').innerHTML = `
       <button class="chip" id="fBad" aria-pressed="${onlyBad}">고칠 것만 보기</button>
-      <span>전체 ${rows.length} · ✅ ${cnt.ok} · ⚠️ ${cnt.bad} · 🟡 ${cnt.warn} · ⏳ ${cnt.wait}${cnt.check ? ` · 점검 중 ${cnt.check}` : ''} · 자료 없는 항목 ${empty}</span>
+      <span>전체 ${rows.length} · ${ICON.ok} ${cnt.ok} · ${ICON.bad} ${cnt.bad} · ${ICON.warn} ${cnt.warn} · ${ICON.wait} ${cnt.wait}${cnt.check ? ` · 점검 중 ${cnt.check}` : ''} · 자료 없는 항목 ${empty}</span>
       <button class="chip" id="fReload">새로 고침</button>
       <span class="deploy">${esc(depText)}</span>`;
     $('fBad').onclick = () => { onlyBad = !onlyBad; drawList(); };
@@ -505,7 +508,7 @@
         return `
           <div class="item${clean ? ' is-clean' : ''}">
             <div class="item__head">${esc(it.name)}</div>
-            ${it.rows.length ? it.rows.map(matHtml).join('') : '<div class="item__empty">○ 자료 없음</div>'}
+            ${it.rows.length ? it.rows.map(matHtml).join('') : `<div class="item__empty">${ICON.none} 자료 없음</div>`}
           </div>`;
       }).join('');
     }).join('');
