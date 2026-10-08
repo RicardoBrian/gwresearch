@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<style>
+  :root {
+    --navy: #2d3c85; --green: #456d2a; --green-dark: #2f4c1b; --green-soft: #e9f1e0;
+    --paper: #f6f8f3; --line: #dfe5d8; --ink: #1f2a1a; --muted: #5b6655;
+    --bad: #b42318; --bad-soft: #fdecea; --warn: #9a6400; --warn-soft: #fff4dc; --wait: #2d5fa8; --wait-soft: #e8f0fb;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.55 "Pretendard Variable", Pretendard, system-ui, sans-serif; word-break: keep-all; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+
+  header { position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 1px solid var(--line); }
+  .bar { max-width: 960px; margin: 0 auto; padding: 14px 16px 0; }
+  h1 { margin: 0 0 10px; color: var(--navy); font-size: 21px; letter-spacing: -0.02em; }
+  .tabs { display: flex; gap: 4px; }
+  .tab { padding: 10px 16px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted); font-weight: 700; cursor: pointer; }
+  .tab[aria-selected="true"] { color: var(--green); border-bottom-color: var(--green); }
+
+  main { max-width: 960px; margin: 0 auto; padding: 20px 16px 80px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+  .note { margin: 0 0 16px; padding: 12px 14px; border-radius: 12px; background: var(--green-soft); color: var(--green-dark); font-size: 14px; }
+
+  .field { display: grid; gap: 6px; margin-bottom: 16px; }
+  .field > span { font-weight: 700; font-size: 14px; }
+  .field small { color: var(--muted); font-weight: 500; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  input[type=text], input[type=url], select, textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+  textarea { min-height: 70px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--green); outline-offset: 0; border-color: var(--green); }
+  .kinds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .kind { position: relative; }
+  .kind input { position: absolute; opacity: 0; }
+  .kind span { display: block; padding: 10px 6px; border: 1px solid var(--line); border-radius: 10px; text-align: center; font-weight: 600; font-size: 14px; cursor: pointer; }
+  .kind input:checked + span { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }
+  .kind input:disabled + span { opacity: .35; cursor: default; }
+  .kind input:focus-visible + span { outline: 2px solid var(--green); }
+  .drop { display: grid; place-items: center; gap: 4px; padding: 22px 12px; border: 2px dashed var(--line); border-radius: 12px; text-align: center; color: var(--muted); cursor: pointer; }
+  .drop.is-over { border-color: var(--green); background: var(--green-soft); }
+  .drop b { color: var(--green); }
+  .files { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+  .files li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; border-radius: 8px; background: var(--paper); font-size: 14px; }
+  .files li.is-bad { background: var(--bad-soft); color: var(--bad); }
+  .files li.is-ok { background: var(--green-soft); color: var(--green-dark); }
+  .err { margin: 6px 0 0; color: var(--bad); font-size: 14px; font-weight: 600; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 18px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-weight: 700; cursor: pointer; }
+  .btn--solid { border-color: var(--green); background: var(--green); color: #fff; }
+  .btn--danger { color: var(--bad); }
+  .btn--sm { padding: 5px 12px; font-size: 13px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+
+  /* 목록 */
+  .summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .chip { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .chip[aria-pressed="true"] { border-color: var(--green); background: var(--green); color: #fff; }
+  .deploy { margin-left: auto; color: var(--muted); font-size: 13px; }
+  .stage { margin: 22px 0 8px; color: var(--navy); font-size: 18px; }
+  .item { margin-bottom: 10px; background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .item__head { padding: 10px 14px; background: #fbfcf9; border-bottom: 1px solid var(--line); font-weight: 700; }
+  .item__empty { padding: 10px 14px; color: var(--muted); font-size: 14px; }
+  .mat { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: start; padding: 10px 14px; border-top: 1px solid #eef1ea; }
+  .mat:first-of-type { border-top: 0; }
+  .mat__state { font-size: 18px; line-height: 1.3; text-align: center; }
+  .mat__title { font-weight: 700; }
+  .mat__meta { color: var(--muted); font-size: 13px; }
+  .mat__why { margin-top: 4px; padding: 6px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .mat__why.is-bad { background: var(--bad-soft); color: var(--bad); }
+  .mat__why.is-warn { background: var(--warn-soft); color: var(--warn); }
+  .mat__why.is-wait { background: var(--wait-soft); color: var(--wait); }
+  .mat__btns { display: flex; gap: 6px; }
+  .hide-ok .mat.is-ok, .hide-ok .item.is-clean { display: none; }
+
+  dialog { width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 0; border-radius: 18px; }
+  dialog::backdrop { background: rgba(20, 30, 10, .45); }
+  .dlg__head { position: sticky; top: 0; padding: 16px 20px; background: #fff; border-bottom: 1px solid var(--line); font-weight: 800; font-size: 17px; }
+  .dlg__body { padding: 18px 20px; }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: calc(100vw - 32px); padding: 12px 18px; border-radius: 12px; background: var(--ink); color: #fff; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.2); z-index: 20; }
+  .center { display: grid; place-items: center; min-height: 50vh; text-align: center; gap: 10px; }
+  .spin { width: 28px; height: 28px; border: 3px solid var(--green-soft); border-top-color: var(--green); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 600px) {
+    .row2 { grid-template-columns: 1fr; }
+    .kinds { grid-template-columns: 1fr 1fr; }
+    .mat { grid-template-columns: 24px 1fr; }
+    .mat__btns { grid-column: 2; }
+    .deploy { margin-left: 0; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>연구학교 자료 올리기</h1>
+    <nav class="tabs" role="tablist" hidden>
+      <button class="tab" role="tab" data-tab="up" aria-selected="true">올리기</button>
+      <button class="tab" role="tab" data-tab="list" aria-selected="false">자료 목록</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- 업로드 코드 -->
+  <section id="login" class="panel" hidden>
+    <p class="note">담당 선생님께 받은 <b>업로드 코드</b>를 넣어 주세요. 이 기기에서는 다음부터 묻지 않아요.</p>
+    <form id="loginForm">
+      <label class="field"><span>업로드 코드</span><input type="text" id="code" autocomplete="off" required></label>
+      <p class="err" id="loginErr" hidden></p>
+      <button class="btn btn--solid" type="submit">시작하기</button>
+    </form>
+  </section>
+
+  <div id="loading" class="center"><div class="spin"></div><div>불러오는 중…</div></div>
+
+  <!-- 올리기 -->
+  <section id="up" hidden>
+    <p class="note">올리면 파일 정리·공유 설정·시트 입력이 자동으로 되고, <b>약 1분 뒤 사이트에 반영</b>돼요. (반영까지 2~3분)</p>
+    <form id="upForm" class="panel" novalidate>
+      <div class="row2">
+        <label class="field"><span>단계</span><select id="stage" required></select></label>
+        <label class="field"><span>항목</span><select id="item" required></select></label>
+      </div>
+
+      <div class="field"><span>자료 종류</span>
+        <div class="kinds">
+          <label class="kind"><input type="radio" name="kind" value="pdf" checked><span>PDF 문서</span></label>
+          <label class="kind"><input type="radio" name="kind" value="intro"><span>카드뉴스(소개)</span></label>
+          <label class="kind"><input type="radio" name="kind" value="video"><span>유튜브 영상</span></label>
+          <label class="kind"><input type="radio" name="kind" value="web"><span>웹사이트·웹앱</span></label>
+        </div>
+      </div>
+
+      <label class="field" data-for="pdf video web"><span>분류 <small>(선택 · 예: 국어, 1학년)</small></span>
+        <input type="text" id="group" list="groups" autocomplete="off"></label>
+      <datalist id="groups"></datalist>
+
+      <label class="field" data-for="pdf video web"><span>제목 <small id="titleHint">(비우면 파일 이름)</small></span>
+        <input type="text" id="title" autocomplete="off"></label>
+
+      <label class="field" data-for="pdf video web"><span>설명 <small>(선택)</small></span>
+        <textarea id="desc"></textarea></label>
+
+      <div class="field" data-for="pdf intro"><span>파일 <small id="fileHint">(PDF · 여러 개 한 번에 가능 · 1개 45MB까지)</small></span>
+        <label class="drop" id="drop"><input type="file" id="file" accept="application/pdf,.pdf" multiple hidden>
+          <span><b>파일 고르기</b> 또는 여기로 끌어다 놓기</span></label>
+        <ul class="files" id="fileList"></ul>
+      </div>
+
+      <label class="field" data-for="video web"><span id="urlLabel">주소</span>
+        <input type="url" id="url" autocomplete="off" placeholder="https://"></label>
+
+      <div class="field" data-for="web"><span>썸네일 그림 <small>(선택 · 웹앱 화면 캡처 · 가로로 긴 그림)</small></span>
+        <input type="file" id="thumb" accept="image/*"></div>
+
+      <label class="field"><span>올린 사람</span><input type="text" id="by" autocomplete="name" placeholder="이름"></label>
+
+      <p class="err" id="upErr" hidden></p>
+      <div class="actions"><button class="btn btn--solid" id="upBtn" type="submit">올리기</button></div>
+    </form>
+  </section>
+
+  <!-- 목록 -->
+  <section id="list" hidden>
+    <div class="summary" id="summary"></div>
+    <div id="tree"></div>
+  </section>
+</main>
+
+<!-- 수정 창 -->
+<dialog id="edit">
+  <form id="editForm" method="dialog">
+    <div class="dlg__head">자료 고치기</div>
+    <div class="dlg__body">
+      <div class="row2">
+        <label class="field"><span>단계</span><select id="eStage"></select></label>
+        <label class="field"><span>항목</span><select id="eItem"></select></label>
+      </div>
+      <label class="field" id="eGroupF"><span>분류</span><input type="text" id="eGroup" list="groups" autocomplete="off"></label>
+      <label class="field" id="eTitleF"><span>제목</span><input type="text" id="eTitle" autocomplete="off"></label>
+      <label class="field" id="eDescF"><span>설명</span><textarea id="eDesc"></textarea></label>
+      <label class="field" id="eUrlF"><span>주소</span><input type="url" id="eUrl" autocomplete="off"></label>
+      <label class="field" id="eFileF"><span>파일 바꾸기 <small>(PDF · 비우면 그대로)</small></span><input type="file" id="eFile" accept="application/pdf,.pdf"></label>
+      <div class="field" id="eThumbF"><span>썸네일 그림 <small id="eThumbNow"></small></span>
+        <input type="file" id="eThumb" accept="image/*">
+        <label><input type="checkbox" id="eThumbDrop"> 썸네일 지우기</label></div>
+      <p class="err" id="editErr" hidden></p>
+      <div class="actions">
+        <button class="btn btn--solid" id="eSave" value="save">저장</button>
+        <button class="btn" value="cancel" formnovalidate>닫기</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const store = {
+    get(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 저장 못 해도 동작 */ } },
+  };
+  const MAX = 45 * 1024 * 1024;
+  const KIND = { pdf: 'PDF', folder: '폴더', intro: '카드뉴스', stageintro: '단계 소개', video: '영상', web: '웹', gdoc: '구글 문서', none: '링크 없음', bad: '링크 오류' };
+  let code = store.get('uploadCode');
+  let lists = null;   // [{name, items}]
+  let STAGE_INTRO = '단계 소개';
+  let data = null;    // 목록 결과
+  let status = {};    // uid → 점검 결과
+
+  // ---- 서버 호출 ----
+  function call(action, p) {
+    return new Promise((res, rej) => google.script.run
+      .withSuccessHandler(res)
+      .withFailureHandler((e) => {
+        const msg = (e && e.message) || String(e);
+        if (msg.indexOf('CODE:') >= 0) { store.set('uploadCode', ''); showLogin(msg.split('CODE:')[1]); }
+        rej(new Error(msg.replace(/^.*CODE:/, '')));
+      })
+      .api(code, action, p === undefined ? null : p));
+  }
+
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 3500);
+  }
+
+  // ---- 시작 ----
+  function showLogin(msg) {
+    $('loading').hidden = true; $('up').hidden = true; $('list').hidden = true;
+    document.querySelector('.tabs').hidden = true;
+    $('login').hidden = false;
+    $('loginErr').hidden = !msg; $('loginErr').textContent = msg || '';
+    $('code').focus();
+  }
+
+  async function start() {
+    if (!code) return showLogin();
+    $('loading').hidden = false; $('login').hidden = true;
+    try {
+      const r = await call('init');
+      lists = r.stages; STAGE_INTRO = r.stageIntro;
+      store.set('uploadCode', code);
+      $('loading').hidden = true;
+      document.querySelector('.tabs').hidden = false;
+      fillStages($('stage')); fillStages($('eStage'));
+      $('by').value = store.get('uploader');
+      syncItems(); syncKind();
+      openTab('up');
+    } catch (e) {
+      if (!$('login').hidden) return;
+      $('loading').innerHTML = `<div>${esc(e.message)}</div><button class="btn" onclick="location.reload()">다시 시도</button>`;
+    }
+  }
+
+  $('loginForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    code = $('code').value.trim();
+    start();
+  });
+
+  // ---- 탭 ----
+  function openTab(name) {
+    document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+    $('up').hidden = name !== 'up';
+    $('list').hidden = name !== 'list';
+    if (name === 'list') loadList();
+  }
+  document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => openTab(b.dataset.tab)));
+
+  // ---- 단계·항목 고르기 ----
+  function fillStages(sel) {
+    sel.innerHTML = '<option value="">단계 고르기</option>' + lists.map((s) => `<option>${esc(s.name)}</option>`).join('');
+  }
+  function fillItems(sel, stage, withIntro) {
+    const st = lists.find((s) => s.name === stage);
+    sel.innerHTML = '<option value="">항목 고르기</option>'
+      + (st && withIntro ? `<option value="${esc(STAGE_INTRO)}">(${esc(STAGE_INTRO)} 카드뉴스)</option>` : '')
+      + (st ? st.items.map((it) => `<option>${esc(it)}</option>`).join('') : '');
+    sel.disabled = !st;
+  }
+  function groupsOf(item) {
+    const set = new Set();
+    (data ? data.rows : []).forEach((r) => { if (r.item === item && r.group && r.group !== '소개') set.add(r.group); });
+    $('groups').innerHTML = [...set].map((g) => `<option value="${esc(g)}">`).join('');
+  }
+  function syncItems() { fillItems($('item'), $('stage').value, true); syncKind(); }
+  $('stage').addEventListener('change', syncItems);
+  $('item').addEventListener('change', () => { syncKind(); groupsOf($('item').value); });
+
+  const kind = () => document.querySelector('input[name=kind]:checked').value;
+  function syncKind() {
+    const intro = $('item').value === STAGE_INTRO;
+    document.querySelectorAll('input[name=kind]').forEach((r) => { r.disabled = intro && r.value !== 'intro'; });
+    if (intro) document.querySelector('input[name=kind][value=intro]').checked = true;
+    const k = kind();
+    document.querySelectorAll('[data-for]').forEach((el) => { el.hidden = el.dataset.for.split(' ').indexOf(k) < 0; });
+    $('file').multiple = k === 'pdf';
+    $('fileHint').textContent = k === 'pdf' ? '(PDF · 여러 개 한 번에 가능 · 1개 45MB까지)' : '(정사각형 PDF 1개 · 한 쪽이 카드 한 장)';
+    $('titleHint').textContent = k === 'pdf' ? '(비우면 파일 이름 · 여러 개면 각 파일 이름)' : '(비우면 영상·사이트 제목)';
+    $('urlLabel').textContent = k === 'video' ? '유튜브 주소' : '웹 주소';
+    $('url').placeholder = k === 'video' ? 'https://youtu.be/…' : 'https://';
+    if (k === 'intro' && files.length > 1) files = files.slice(0, 1);
+    drawFiles();
+  }
+  document.querySelectorAll('input[name=kind]').forEach((r) => r.addEventListener('change', syncKind));
+
+  // ---- 파일 고르기 ----
+  let files = [];
+  function addFiles(list) {
+    const pdfs = [...list].filter((f) => /\.pdf$/i.test(f.name) || f.type === 'application/pdf');
+    if (pdfs.length < list.length) toast('PDF가 아닌 파일은 뺐어요. PDF로 저장해서 올려 주세요.');
+    files = kind() === 'pdf' ? files.concat(pdfs) : pdfs.slice(0, 1);
+    drawFiles();
+  }
+  function drawFiles(result) {
+    $('fileList').innerHTML = files.map((f, k) => {
+      const r = result && result[k];
+      const big = f.size > MAX;
+      const cls = r ? (r.ok ? 'is-ok' : 'is-bad') : big ? 'is-bad' : '';
+      const note = r ? (r.ok ? '올림 ✓' : r.why) : big ? '45MB 초과 — 올릴 수 없어요' : `${(f.size / 1048576).toFixed(1)}MB <button type="button" class="btn btn--sm" data-rm="${k}">빼기</button>`;
+      return `<li class="${cls}"><span>${esc(f.name)}</span><span>${r || big ? esc(note) : note}</span></li>`;
+    }).join('');
+    $('fileList').querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => { files.splice(Number(b.dataset.rm), 1); drawFiles(); }));
+  }
+  $('file').addEventListener('change', () => { addFiles($('file').files); $('file').value = ''; });
+  const drop = $('drop');
+  ['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('is-over'); }));
+  ['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('is-over'); }));
+  drop.addEventListener('drop', (e) => addFiles(e.dataTransfer.files));
+
+  function readFile(f) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res({ name: f.name, type: f.type, data: String(r.result).split(',')[1] });
+      r.onerror = () => rej(new Error(`${f.name}: 파일을 읽지 못했어요.`));
+      r.readAsDataURL(f);
+    });
+  }
+
+  // ---- 올리기 ----
+  function fail(id, msg) { $(id).textContent = msg; $(id).hidden = !msg; }
+
+  $('upForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    fail('upErr', '');
+    const k = kind();
+    const base = {
+      stage: $('stage').value, item: $('item').value, kind: k,
+      group: k === 'intro' ? '' : $('group').value.trim(),
+      title: $('title').value.trim(), desc: $('desc').value.trim(), by: $('by').value.trim(),
+    };
+    // 미리 막기
+    if (!base.stage) return fail('upErr', '단계를 골라 주세요.');
+    if (!base.item) return fail('upErr', '항목을 골라 주세요.');
+    if (base.group === '소개') return fail('upErr', "분류에 '소개'는 쓸 수 없어요. 카드뉴스는 '카드뉴스(소개)'를 골라 주세요.");
+    if (!base.by) return fail('upErr', '올린 사람 이름을 적어 주세요.');
+    if ((k === 'pdf' || k === 'intro') && !files.length) return fail('upErr', '파일을 골라 주세요.');
+    if (files.some((f) => f.size > MAX) && (k === 'pdf' || k === 'intro')) return fail('upErr', '45MB가 넘는 파일은 빼 주세요.');
+    const url = $('url').value.trim();
+    if (k === 'video' && !/(youtu\.be\/|youtube\.com\/)/.test(url)) return fail('upErr', '유튜브 주소를 넣어 주세요.');
+    if (k === 'web' && !/^(https?:\/\/)?[\w-]+(\.[\w-]+)+/i.test(url)) return fail('upErr', '웹 주소를 넣어 주세요. (예: https://…)');
+    store.set('uploader', base.by);
+
+    const btn = $('upBtn');
+    btn.disabled = true;
+    try {
+      if (k === 'pdf' || k === 'intro') {
+        // 파일마다 한 줄씩 (하나가 실패해도 나머지는 올림)
+        const result = [];
+        for (let i = 0; i < files.length; i++) {
+          btn.textContent = `올리는 중… ${i + 1} / ${files.length}`;
+          try {
+            const file = await readFile(files[i]);
+            await call('upload', Object.assign({}, base, { file, title: files.length > 1 ? '' : base.title }));
+            result[i] = { ok: true };
+          } catch (err) {
+            result[i] = { ok: false, why: err.message };
+          }
+          drawFiles(result);
+        }
+        const failed = result.filter((r) => !r.ok).length;
+        if (failed) {
+          fail('upErr', `${files.length}개 중 ${failed}개를 올리지 못했어요. 빨간 줄의 이유를 확인해 주세요.`);
+          files = files.filter((_, i) => !result[i].ok);
+        } else {
+          toast(`${files.length}개 올렸어요. 약 1분 뒤 사이트에 반영돼요.`);
+          files = []; resetText();
+        }
+      } else {
+        btn.textContent = '올리는 중…';
+        const p = Object.assign({}, base, { url });
+        if (k === 'web' && $('thumb').files[0]) {
+          const t = $('thumb').files[0];
+          if (t.size > MAX) throw new Error('썸네일 그림이 너무 커요.');
+          p.thumb = await readFile(t);
+        }
+        await call('upload', p);
+        toast('올렸어요. 약 1분 뒤 사이트에 반영돼요.');
+        resetText();
+      }
+      data = null; // 목록 새로 읽게
+    } catch (err) {
+      fail('upErr', err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = '올리기';
+    }
+  });
+
+  function resetText() {
+    ['title', 'desc', 'url'].forEach((id) => { $(id).value = ''; });
+    $('thumb').value = '';
+    setTimeout(() => drawFiles(), 2500);
+  }
+
+  // ---- 목록 ----
+  let onlyBad = false;
+
+  async function loadList() {
+    $('tree').innerHTML = '<div class="center"><div class="spin"></div><div>목록 불러오는 중…</div></div>';
+    $('summary').innerHTML = '';
+    try {
+      data = await call('list');
+      lists = data.stages;
+      status = {};
+      drawList();
+      checkAll();
+    } catch (e) {
+      $('tree').innerHTML = `<p class="err">${esc(e.message)}</p>`;
+    }
+  }
+
+  function stageOfRow(r) {
+    if (r.kind === 'stageintro') return lists.find((s) => s.name.replace(/^\d+\s*/, '') === r.stage.replace(/^\d+\s*/, '')) || null;
+    return lists.find((s) => s.items.indexOf(r.item) >= 0) || null;
+  }
+
+  function stateOf(r) {
+    const s = status[r.uid];
+    if (!s) return { icon: '⋯', cls: 'is-check' };
+    if (s.s === 'bad') return { icon: '⚠️', cls: 'is-bad', why: s.why, fix: s.fix };
+    if (s.s === 'warn') return { icon: '🟡', cls: 'is-warn', why: s.why, fix: s.fix };
+    if (data.deploy && r.at > data.deploy.lastDeploy) return { icon: '⏳', cls: 'is-wait', why: '사이트 반영 대기 중 (곧 자동 반영)' };
+    return { icon: '✅', cls: 'is-ok' };
+  }
+
+  const FIX = { share: '공유 열기', 'share-thumb': '썸네일 공유 열기', restore: '휴지통에서 꺼내기', unhide: '주소로 바꾸기' };
+
+  function matHtml(r) {
+    const st = stateOf(r);
+    const meta = [KIND[r.kind] || '', r.group && r.group !== '소개' ? r.group : '', r.by ? `올린 사람 ${r.by}` : ''].filter(Boolean).join(' · ');
+    return `
+      <div class="mat ${st.cls === 'is-ok' ? 'is-ok' : ''}" data-uid="${esc(r.uid)}">
+        <div class="mat__state" title="${esc(st.why || '정상')}">${st.icon}</div>
+        <div>
+          <div class="mat__title">${esc(r.title || (r.kind === 'intro' || r.kind === 'stageintro' ? '소개 카드뉴스' : '(제목 없음)'))}</div>
+          <div class="mat__meta">${esc(meta)} · 시트 ${r.row}행</div>
+          ${st.why ? `<div class="mat__why ${st.cls}">${esc(st.why)}${st.fix ? ` <button class="btn btn--sm" data-fix="${esc(st.fix)}">${esc(FIX[st.fix] || '고치기')}</button>` : ''}</div>` : ''}
+        </div>
+        <div class="mat__btns">
+          <button class="btn btn--sm" data-edit>고치기</button>
+          <button class="btn btn--sm btn--danger" data-del>삭제</button>
+        </div>
+      </div>`;
+  }
+
+  function drawList() {
+    const rows = data.rows;
+    const cnt = { ok: 0, bad: 0, warn: 0, wait: 0, check: 0 };
+    rows.forEach((r) => {
+      const st = stateOf(r);
+      const k = { 'is-ok': 'ok', 'is-bad': 'bad', 'is-warn': 'warn', 'is-wait': 'wait', 'is-check': 'check' }[st.cls];
+      cnt[k]++;
+    });
+    const empty = lists.reduce((n, s) => n + s.items.filter((it) => !rows.some((r) => r.item === it)).length, 0);
+    const dep = data.deploy || {};
+    const depText = dep.pending ? '사이트 반영 예정 (1분 안)'
+      : dep.lastDeploy ? `마지막 자동 반영 ${new Date(dep.lastDeploy).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '';
+    $('summary').innerHTML = `
+      <button class="chip" id="fBad" aria-pressed="${onlyBad}">고칠 것만 보기</button>
+      <span>전체 ${rows.length} · ✅ ${cnt.ok} · ⚠️ ${cnt.bad} · 🟡 ${cnt.warn} · ⏳ ${cnt.wait}${cnt.check ? ` · 점검 중 ${cnt.check}` : ''} · 자료 없는 항목 ${empty}</span>
+      <button class="chip" id="fReload">새로 고침</button>
+      <span class="deploy">${esc(depText)}</span>`;
+    $('fBad').onclick = () => { onlyBad = !onlyBad; drawList(); };
+    $('fReload').onclick = loadList;
+
+    // 단계 → 항목 → 자료 (시트 순서)
+    const html = lists.map((s) => {
+      const intro = rows.filter((r) => r.kind === 'stageintro' && stageOfRow(r) === s);
+      const items = [{ name: `${STAGE_INTRO} 카드뉴스`, rows: intro, intro: true }]
+        .concat(s.items.map((it) => ({ name: it, rows: rows.filter((r) => r.kind !== 'stageintro' && r.item === it) })));
+      return `<h2 class="stage">${esc(s.name)}</h2>` + items.map((it) => {
+        if (it.intro && !it.rows.length) return '';
+        const clean = it.rows.length && it.rows.every((r) => stateOf(r).cls === 'is-ok');
+        return `
+          <div class="item${clean ? ' is-clean' : ''}">
+            <div class="item__head">${esc(it.name)}</div>
+            ${it.rows.length ? it.rows.map(matHtml).join('') : '<div class="item__empty">○ 자료 없음</div>'}
+          </div>`;
+      }).join('');
+    }).join('');
+    // 로드맵에 없는 항목에 들어간 줄
+    const lost = rows.filter((r) => !stageOfRow(r));
+    $('tree').innerHTML = html + (lost.length ? `<h2 class="stage">항목을 알 수 없는 자료</h2><div class="item">${lost.map(matHtml).join('')}</div>` : '');
+    $('tree').classList.toggle('hide-ok', onlyBad);
+    bindRows();
+  }
+
+  function bindRows() {
+    $('tree').querySelectorAll('.mat').forEach((el) => {
+      const r = data.rows.find((x) => x.uid === el.dataset.uid);
+      el.querySelector('[data-edit]').onclick = () => openEdit(r);
+      el.querySelector('[data-del]').onclick = () => remove(r);
+      const fx = el.querySelector('[data-fix]');
+      if (fx) fx.onclick = async () => {
+        fx.disabled = true;
+        try {
+          status[r.uid] = await call('fix', { uid: r.uid, fix: fx.dataset.fix });
+          r.at = Date.now();
+          toast('고쳤어요. 약 1분 뒤 사이트에 반영돼요.');
+          drawList();
+        } catch (e) { toast(e.message); fx.disabled = false; }
+      };
+    });
+  }
+
+  // 8줄씩 나눠 3개씩 동시에 점검 → 아이콘이 하나씩 채워짐
+  async function checkAll() {
+    const uids = data.rows.map((r) => r.uid);
+    const chunks = [];
+    for (let i = 0; i < uids.length; i += 8) chunks.push(uids.slice(i, i + 8));
+    const mine = data;
+    let redraw = 0;
+    const worker = async () => {
+      while (chunks.length) {
+        const c = chunks.shift();
+        try { Object.assign(status, await call('check', c)); } catch (e) { c.forEach((u) => { status[u] = { s: 'warn', why: '점검하지 못했어요 (새로 고침해 보세요)' }; }); }
+        if (data !== mine) return;
+        cancelAnimationFrame(redraw); redraw = requestAnimationFrame(drawList);
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+  }
+
+  async function remove(r) {
+    if (!confirm(`'${r.title || r.item}'을(를) 삭제할까요?\n시트에서 지워지고, 앱으로 올린 파일은 드라이브 휴지통으로 가요(30일 안에 되살릴 수 있어요).`)) return;
+    try {
+      await call('remove', r.uid);
+      data.rows = data.rows.filter((x) => x !== r);
+      toast('삭제했어요. 약 1분 뒤 사이트에 반영돼요.');
+      drawList();
+    } catch (e) { toast(e.message); }
+  }
+
+  // ---- 고치기 창 ----
+  let editing = null;
+  function openEdit(r) {
+    editing = r;
+    fail('editErr', '');
+    const st = stageOfRow(r);
+    $('eStage').value = st ? st.name : '';
+    const isStageIntro = r.kind === 'stageintro';
+    fillItems($('eItem'), $('eStage').value, isStageIntro);
+    $('eItem').value = isStageIntro ? STAGE_INTRO : r.item;
+    $('eItem').disabled = isStageIntro;
+    $('eGroup').value = r.group === '소개' ? '' : r.group;
+    $('eTitle').value = r.title; $('eDesc').value = r.desc;
+    $('eUrl').value = r.link;
+    $('eFile').value = ''; $('eThumb').value = ''; $('eThumbDrop').checked = false;
+    const fileKind = ['pdf', 'intro', 'stageintro'].indexOf(r.kind) >= 0;
+    $('eGroupF').hidden = r.kind === 'intro' || isStageIntro;
+    $('eTitleF').hidden = r.kind === 'intro' || isStageIntro;
+    $('eDescF').hidden = r.kind === 'intro' || isStageIntro;
+    $('eUrlF').hidden = ['video', 'web', 'gdoc'].indexOf(r.kind) < 0;
+    $('eFileF').hidden = !fileKind;
+    $('eThumbF').hidden = r.kind !== 'web' && r.kind !== 'gdoc';
+    $('eThumbNow').textContent = r.thumb ? '(지금 있음)' : '(없음)';
+    groupsOf(r.item);
+    $('edit').showModal();
+  }
+  $('eStage').addEventListener('change', () => fillItems($('eItem'), $('eStage').value, editing && editing.kind === 'stageintro'));
+
+  $('editForm').addEventListener('submit', async (e) => {
+    if (e.submitter && e.submitter.value === 'cancel') return;
+    e.preventDefault();
+    const r = editing;
+    const p = {
+      uid: r.uid, stage: $('eStage').value, item: r.kind === 'stageintro' ? STAGE_INTRO : $('eItem').value,
+      group: $('eGroup').value.trim(), title: $('eTitle').value.trim(), desc: $('eDesc').value.trim(),
+    };
+    if (!p.stage || !p.item) return fail('editErr', '단계와 항목을 골라 주세요.');
+    if (!$('eUrlF').hidden) p.url = $('eUrl').value.trim();
+    const btn = $('eSave');
+    btn.disabled = true; btn.textContent = '저장 중…';
+    try {
+      const f = $('eFile').files[0];
+      if (f) {
+        if (f.size > MAX) throw new Error('45MB가 넘는 파일은 올릴 수 없어요.');
+        p.file = await readFile(f);
+      }
+      const t = $('eThumb').files[0];
+      if (t) p.thumb = await readFile(t);
+      else if ($('eThumbDrop').checked) p.dropThumb = true;
+      await call('update', p);
+      $('edit').close();
+      toast('저장했어요. 약 1분 뒤 사이트에 반영돼요.');
+      loadList();
+    } catch (err) {
+      fail('editErr', err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = '저장';
+    }
+  });
+
+  start();
+})();
+</script>
+</body>
+</html>

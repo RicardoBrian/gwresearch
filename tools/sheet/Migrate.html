@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<style>
+  body { margin: 0; padding: 4px 4px 16px; color: #1f2a1a; font: 14px/1.55 system-ui, sans-serif; word-break: keep-all; }
+  p { margin: 0 0 10px; }
+  .note { padding: 10px 12px; border-radius: 10px; background: #e9f1e0; color: #2f4c1b; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid #e4e9de; text-align: left; vertical-align: top; }
+  th { background: #f6f8f3; position: sticky; top: 0; }
+  .bad { color: #b42318; font-weight: 600; }
+  .ok { color: #2f4c1b; font-weight: 600; }
+  .wrap { max-height: 300px; overflow: auto; border: 1px solid #e4e9de; border-radius: 10px; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  button { padding: 9px 16px; border: 1px solid #dfe5d8; border-radius: 999px; background: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+  button.solid { border-color: #456d2a; background: #456d2a; color: #fff; }
+  button:disabled { opacity: .45; cursor: default; }
+  #msg { font-weight: 600; }
+</style>
+</head>
+<body>
+<p class="note">시트에 링크된 <b>드라이브 파일·폴더를 내 드라이브 '연구학교 자료' 폴더로 복사</b>하고, 시트 링크를 복사본으로 바꿉니다.
+원본은 그대로 두고, 원래 링크는 <b>'이전 링크'</b> 칸에 남겨서 언제든 되돌릴 수 있어요. 유튜브·웹 주소 줄은 그대로예요.</p>
+<p id="msg">정리할 자료를 찾는 중…</p>
+<div class="wrap" id="wrap" hidden><table><thead><tr><th>행</th><th>제목</th><th>파일</th><th>상태</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="btns">
+  <button class="solid" id="run" disabled>정리 시작</button>
+  <button id="undo">되돌리기 (이전 링크로)</button>
+  <button onclick="google.script.host.close()">닫기</button>
+</div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const run = (fn, ...args) => new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
+  let plan = [];
+
+  function draw() {
+    $('rows').innerHTML = plan.map((p) => `
+      <tr id="r-${esc(p.uid)}"><td>${p.row}</td><td>${esc(p.title)}</td><td>${esc(p.name || '')}</td>
+      <td class="${p.problem || p.result === false ? 'bad' : p.result ? 'ok' : ''}">${esc(p.problem || p.status || '대기')}</td></tr>`).join('');
+  }
+
+  async function load() {
+    try {
+      plan = await run('migratePlan');
+      const can = plan.filter((p) => !p.problem);
+      $('msg').textContent = plan.length
+        ? `정리할 자료 ${can.length}개${plan.length > can.length ? ` · 열 수 없는 자료 ${plan.length - can.length}개(빨간 줄, 건너뜀)` : ''}. 확인 후 [정리 시작]을 눌러 주세요.`
+        : '정리할 자료가 없어요. 이미 모두 정리되어 있어요.';
+      $('wrap').hidden = !plan.length;
+      $('run').disabled = !can.length;
+      draw();
+    } catch (e) { $('msg').textContent = e.message; }
+  }
+
+  $('run').onclick = async () => {
+    $('run').disabled = true; $('undo').disabled = true;
+    const todo = plan.filter((p) => !p.problem);
+    let done = 0, failed = 0;
+    // 3줄씩 (복사는 시간이 걸려서 실행 시간 제한 안쪽으로)
+    for (let i = 0; i < todo.length; i += 3) {
+      const part = todo.slice(i, i + 3);
+      part.forEach((p) => { p.status = '복사 중…'; }); draw();
+      try {
+        const res = await run('migrateRun', part.map((p) => p.uid));
+        res.forEach((r) => {
+          const p = plan.find((x) => x.uid === r.uid);
+          p.result = r.ok; p.status = r.ok ? '완료' : `실패: ${r.why}`;
+          r.ok ? done++ : failed++;
+        });
+      } catch (e) {
+        part.forEach((p) => { p.result = false; p.status = `실패: ${e.message}`; failed++; });
+      }
+      $('msg').textContent = `정리 중… ${done + failed} / ${todo.length}`;
+      draw();
+    }
+    await run('migrateFinish').catch(() => {});
+    $('msg').textContent = `끝났어요. 완료 ${done}개${failed ? ` · 실패 ${failed}개(빨간 줄 — 다시 열어 [정리 시작]을 누르면 실패한 것만 다시 해요)` : ''}. 약 1분 뒤 사이트에 반영돼요.`;
+    $('undo').disabled = false;
+  };
+
+  $('undo').onclick = async () => {
+    if (!confirm('정리한 모든 줄의 링크를 원래 링크로 되돌릴까요? (복사한 파일은 드라이브에 남아요)')) return;
+    $('undo').disabled = true;
+    try {
+      const n = await run('migrateUndo');
+      $('msg').textContent = `${n}개 줄을 원래 링크로 되돌렸어요. 약 1분 뒤 사이트에 반영돼요.`;
+      load();
+    } catch (e) { $('msg').textContent = e.message; }
+    $('undo').disabled = false;
+  };
+
+  load();
+</script>
+</body>
+</html>
