@@ -503,7 +503,12 @@ def main():
                             fm[key] = row[key]
                     out.append(fm)
                 continue
-            if web_url(f):
+            if re.search(r"(youtube\.com|youtu\.be)/", f) and youtube_id(f):
+                # PDF 링크 칸에 넣은 유튜브 주소 → 영상으로 (유튜브 링크 칸에 넣은 것과 같게)
+                vid = youtube_id(f)
+                title = row.get("title") or youtube_title(vid)
+                m.update(type="video", youtube=vid)
+            elif web_url(f):
                 f = web_url(f)
                 # 웹사이트·웹앱: 자료 창 안에 띄움 (막힌 사이트는 '새 창에서 열기' 카드)
                 if f.lower().startswith("http://"):

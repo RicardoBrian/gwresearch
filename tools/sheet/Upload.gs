@@ -246,6 +246,7 @@ function kindOf_(r) {
   if (norm_(r.group) === '소개') return 'intro';
   if (r.youtube) return 'video';
   if (!r.file) return 'none';
+  if (/(youtube\.com|youtu\.be)\//.test(r.file) && ytId_(r.file)) return 'video'; // PDF 링크 칸의 유튜브 주소
   if (folderId_(r.file)) return 'folder';
   if (driveId_(r.file)) return 'pdf';
   if (gdocId_(r.file)) return 'gdoc';
@@ -513,9 +514,10 @@ function checkRow_(r, stages) {
   if (kind === 'none') return bad('링크가 비어 있어요');
   if (kind === 'bad') return bad('링크를 알아볼 수 없어요');
   if (kind === 'video') {
-    const did = driveId_(r.youtube);
+    const vlink = r.youtube || r.file;
+    const did = driveId_(vlink);
     if (did) res = checkFile_(did, false);
-    else if (!ytId_(r.youtube)) return bad('유튜브 주소를 알아볼 수 없어요');
+    else if (!ytId_(vlink)) return bad('유튜브 주소를 알아볼 수 없어요');
   } else if (kind === 'folder') {
     let f;
     try { f = DriveApp.getFolderById(folderId_(r.file)); } catch (e) { return bad('폴더를 열 수 없어요 (지워졌거나 공유가 꺼져 있어요)'); }
@@ -683,7 +685,7 @@ function update_(p) {
       const url = String(p.url).trim();
       if (kind === 'video') {
         if (!ytId_(url) && !driveId_(url)) throw new Error('유튜브 주소를 알아볼 수 없어요.');
-        data.youtube = url;
+        data[cur.youtube ? 'youtube' : 'file'] = url; // 원래 들어 있던 칸에
       } else {
         if (!isWeb_(url)) throw new Error('웹 주소를 알아볼 수 없어요.');
         data.file = /^https?:\/\//i.test(url) ? url : 'https://' + url;
