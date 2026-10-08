@@ -313,7 +313,7 @@ function inRoot_(x) {
 function openFile_(id) { try { return DriveApp.getFileById(id); } catch (e) { return null; } }
 
 // 드라이브 링크의 PDF를 폴더로 복사 → {f: 복사본, name: 원래 이름}
-function copyFromLink_(link, folder) {
+function copyFromLink_(link, folder, allowVideo) {
   const id = driveId_(link);
   if (!id) {
     if (gdocId_(link)) throw new Error("구글 문서·시트·슬라이드는 PDF가 아니에요. '웹사이트·웹앱'으로 올리거나 PDF로 저장해 주세요.");
@@ -321,7 +321,11 @@ function copyFromLink_(link, folder) {
   }
   const src = openFile_(id);
   if (!src) throw new Error("파일을 열 수 없어요. 공유를 '링크가 있는 모든 사용자'로 바꾸거나, 파일을 내려받아 [내 컴퓨터에서 올리기]로 올려 주세요.");
-  if (src.getMimeType() !== MimeType.PDF) throw new Error(`PDF가 아니에요 (${src.getName()}). PDF로 저장해서 올려 주세요.`);
+  const video = /^video\//.test(src.getMimeType());
+  if (allowVideo === 'only' && !video) throw new Error(`동영상 파일이 아니에요 (${src.getName()}).`);
+  if (allowVideo !== 'only' && src.getMimeType() !== MimeType.PDF && !(allowVideo && video)) {
+    throw new Error(`PDF가 아니에요 (${src.getName()}). PDF로 저장해서 올려 주세요.`);
+  }
   return { f: src.makeCopy(src.getName(), folder), name: src.getName() };
 }
 
@@ -348,7 +352,7 @@ function expand_(link) {
 
 function cleanTitle_(name) {
   name = String(name).trim().replace(/\s*의 사본$/, '').replace(/^(?:Copy of|사본)\s+/, '');
-  name = name.replace(/\.(pdf|png|jpe?g|gif|webp)$/i, '');
+  name = name.replace(/\.(pdf|png|jpe?g|gif|webp|mp4|mov|m4v|avi|wmv|mkv|webm)$/i, '');
   return name.replace(/^\d+\s*[._\-)]\s*/, '').trim() || name;
 }
 
@@ -505,7 +509,7 @@ function checkRow_(r, stages) {
   } else if (kind === 'pdf' || kind === 'intro' || kind === 'stageintro') {
     const id = driveId_(r.file);
     if (!id) return bad('드라이브 PDF 링크가 아니에요');
-    res = checkFile_(id, true);
+    res = checkFile_(id, true, kind === 'pdf');
   } else if (kind === 'web') {
     const werr = webError_(r.file);
     if (werr) return bad(werr);
@@ -528,11 +532,15 @@ function checkRow_(r, stages) {
   return ok;
 }
 
-function checkFile_(id, needPdf) {
+// allowVideo: PDF 링크 칸의 드라이브 동영상도 괜찮음 (사이트가 영상으로 보여 줌)
+function checkFile_(id, needPdf, allowVideo) {
   const f = openFile_(id);
   if (!f) return { s: 'bad', why: '파일을 열 수 없어요 (지워졌거나 공유가 꺼져 있어요)' };
   if (f.isTrashed()) return { s: 'bad', why: '파일이 휴지통에 있어요', fix: mine_(f) ? 'restore' : '' };
-  if (needPdf && f.getMimeType() !== MimeType.PDF) return { s: 'bad', why: `PDF가 아니에요 (${f.getName()})` };
+  const video = /^video\//.test(f.getMimeType());
+  if (needPdf && f.getMimeType() !== MimeType.PDF && !(allowVideo && video)) {
+    return { s: 'bad', why: `PDF가 아니에요 (${f.getName()})` };
+  }
   if (!shared_(f)) return { s: 'bad', why: '공유가 꺼져 있어요', fix: mine_(f) ? 'share' : '' };
   return { s: 'ok' };
 }
@@ -568,8 +576,18 @@ function upload_(p) {
       row.file = fileUrl_(got.f);
       if (!row.title) row.title = p.kind === 'intro' ? '소개' : cleanTitle_(got.name);
     } else if (p.kind === 'video') {
-      if (!ytId_(p.url)) throw new Error('유튜브 주소를 알아볼 수 없어요.');
-      row.youtube = String(p.url).trim();
+      if (driveId_(p.url)) {
+        // 드라이브 동영상: 폴더로 복사하고 공유를 열어 유튜브 링크 칸에 (사이트가 드라이브 재생기로 보여 줌)
+        const got = copyFromLink_(p.url, folderFor_(v.stage, v.item, row.group), 'only');
+        made.push(got.f);
+        publish_(got.f);
+        row.youtube = fileUrl_(got.f);
+        if (!row.title) row.title = cleanTitle_(got.name);
+      } else if (ytId_(p.url)) {
+        row.youtube = String(p.url).trim();
+      } else {
+        throw new Error('유튜브 주소나 드라이브 동영상 링크를 알아볼 수 없어요.');
+      }
     } else if (p.kind === 'web') {
       let url = String(p.url || '').trim();
       if (!isWeb_(url)) throw new Error('웹 주소를 알아볼 수 없어요. (예: https://…)');
@@ -617,7 +635,7 @@ function update_(p) {
     // 파일 교체 (PDF·카드뉴스)
     if ((p.file || p.link) && (kind === 'pdf' || kind === 'intro' || kind === 'stageintro')) {
       const folder = folderFor_(v.stage, v.item, group);
-      const f = p.link ? copyFromLink_(p.link, folder).f : folder.createFile(blob_(p.file, true));
+      const f = p.link ? copyFromLink_(p.link, folder, kind === 'pdf').f : folder.createFile(blob_(p.file, true));
       made.push(f);
       publish_(f);
       data.file = fileUrl_(f);

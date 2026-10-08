@@ -296,6 +296,9 @@ def drive_page_title(fid):
     return "" if name.lower() in ("google drive", "google 드라이브", "") else name
 
 
+VIDEO_RE = re.compile(r"\.(mp4|mov|m4v|avi|wmv|mkv|webm)$", re.I)
+
+
 def probe_drive(fid):
     """드라이브 파일 앞부분(1KB)만 읽어 (PDF 여부, 파일 이름, 오류) 확인. 파일 전체는 받지 않음.
     실제 PDF 는 방문자가 열 때 Cloudflare 함수(functions/pdf/[id].js)가 드라이브에서 가져옴."""
@@ -534,12 +537,18 @@ def main():
                 if err:
                     errors.append(f"{where}: 드라이브 파일을 확인하지 못했습니다 ({err}). 파일이 지워졌는지 확인해 주세요.")
                     continue
-                if not is_pdf:
+                if not is_pdf and VIDEO_RE.search(fname or ""):
+                    # PDF 링크 칸에 넣은 드라이브 동영상 → 영상으로 (유튜브 링크 칸에 넣은 것과 같게)
+                    title = row.get("title") or clean_title(fname)
+                    m.update(type="video", drive=drive_id(f))
+                elif not is_pdf:
                     errors.append(f"{where}: PDF를 받을 수 없습니다. 파일이 PDF인지, 공유 설정이 "
-                                  "'링크가 있는 모든 사용자'인지 확인해 주세요.")
+                                  "'링크가 있는 모든 사용자'인지 확인해 주세요."
+                                  + (f" (파일 이름: {fname})" if fname else ""))
                     continue
-                title = row.get("title") or clean_title(fname)
-                m.update(type="pdf", file=f"pdf/{drive_id(f)}")
+                else:
+                    title = row.get("title") or clean_title(fname)
+                    m.update(type="pdf", file=f"pdf/{drive_id(f)}")
             else:
                 got = local_pdf(f, errors, where)
                 if not got:

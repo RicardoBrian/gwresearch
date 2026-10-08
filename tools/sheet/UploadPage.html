@@ -49,6 +49,10 @@
   .drop { display: grid; place-items: center; gap: 4px; padding: 22px 12px; border: 2px dashed var(--line); border-radius: 12px; text-align: center; color: var(--muted); cursor: pointer; }
   .drop.is-over { border-color: var(--green); background: var(--green-soft); }
   .drop b { color: var(--green); }
+  .linkrow { display: flex; gap: 8px; align-items: center; }
+  .linkrow input { flex: 1; min-width: 0; }
+  .linkrow .btn { flex: none; text-decoration: none; color: var(--ink); }
+  #eWhy { margin: 0 0 14px; }
   .srcs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
   .hint { display: block; margin-top: 6px; color: var(--muted); font-size: 13px; }
   .files { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
@@ -235,13 +239,15 @@
         <label class="field"><span>단계</span><select id="eStage"></select></label>
         <label class="field"><span>항목</span><select id="eItem"></select></label>
       </div>
+      <p class="mat__why" id="eWhy" hidden></p>
       <label class="field" id="eGroupF"><span>분류</span><input type="text" id="eGroup" list="groups" autocomplete="off"></label>
       <label class="field" id="eTitleF"><span>제목</span><input type="text" id="eTitle" autocomplete="off"></label>
       <label class="field" id="eDescF"><span>설명</span><textarea id="eDesc"></textarea></label>
-      <label class="field" id="eUrlF"><span>주소</span><input type="text" inputmode="url" id="eUrl" autocomplete="off"></label>
-      <div class="field" id="eFileF"><span>파일 바꾸기 <small>(PDF · 비우면 그대로 · 파일 또는 드라이브 링크 중 하나)</small></span>
-        <input type="file" id="eFile" accept="application/pdf,.pdf">
-        <input type="text" id="eLink" autocomplete="off" placeholder="또는 드라이브 파일 링크"></div>
+      <div class="field" id="eUrlF"><span>주소 <small>(지금 들어 있는 주소)</small></span>
+        <div class="linkrow"><input type="text" inputmode="url" id="eUrl" autocomplete="off"><a class="btn btn--sm" id="eUrlOpen" target="_blank" rel="noopener">열어 보기</a></div></div>
+      <div class="field" id="eFileF"><span>파일 링크 <small>(지금 들어 있는 링크 · 바꾸려면 새 드라이브 링크를 넣거나 아래에서 파일을 고르세요)</small></span>
+        <div class="linkrow"><input type="text" id="eLink" autocomplete="off"><a class="btn btn--sm" id="eLinkOpen" target="_blank" rel="noopener">열어 보기</a></div>
+        <label class="hint">또는 내 컴퓨터에서 PDF 고르기 <input type="file" id="eFile" accept="application/pdf,.pdf"></label></div>
       <div class="field" id="eThumbF"><span>썸네일 그림 <small id="eThumbNow"></small></span>
         <input type="file" id="eThumb" accept="image/*">
         <label><input type="checkbox" id="eThumbDrop"> 썸네일 지우기</label></div>
@@ -361,7 +367,7 @@
     $('file').multiple = k === 'pdf';
     $('fileHint').textContent = k === 'pdf' ? '(PDF · 여러 개 한 번에 가능 · 1개 45MB까지)' : '(정사각형 PDF 1개 · 한 쪽이 카드 한 장)';
     $('titleHint').textContent = k === 'pdf' ? '(비우면 파일 이름 · 여러 개면 각 파일 이름)' : '(비우면 영상·사이트 제목)';
-    $('urlLabel').textContent = k === 'video' ? '유튜브 주소' : '웹 주소';
+    $('urlLabel').textContent = k === 'video' ? '유튜브 주소 또는 드라이브 동영상 링크' : '웹 주소';
     $('url').placeholder = k === 'video' ? 'https:\/\/youtu.be/…' : 'https:\/\/';
     if (k === 'intro' && files.length > 1) files = files.slice(0, 1);
     drawFiles();
@@ -453,7 +459,7 @@
     if ((k === 'pdf' || k === 'intro') && !files.length) return fail('upErr', src() === 'link' ? '가져올 PDF가 없어요.' : '파일을 골라 주세요.');
     if (files.some((f) => f.size > MAX) && (k === 'pdf' || k === 'intro')) return fail('upErr', '45MB가 넘는 파일은 빼 주세요.');
     const url = $('url').value.trim();
-    if (k === 'video' && !/(youtu\.be\/|youtube\.com\/)/.test(url)) return fail('upErr', '유튜브 주소를 넣어 주세요.');
+    if (k === 'video' && !/(youtu\.be\/|youtube\.com\/|drive\.google\.com\/)/.test(url)) return fail('upErr', '유튜브 주소나 드라이브 동영상 링크를 넣어 주세요.');
     if (k === 'web' && !/^(https?:\/\/)?[\w-]+(\.[\w-]+)+/i.test(url)) return fail('upErr', '웹 주소를 넣어 주세요. (예: https:\/\/…)');
     store.set('uploader', base.by);
 
@@ -800,7 +806,15 @@
     $('eGroup').value = r.group === '소개' ? '' : r.group;
     $('eTitle').value = r.title; $('eDesc').value = r.desc;
     $('eUrl').value = r.link;
-    $('eFile').value = ''; $('eLink').value = ''; $('eThumb').value = ''; $('eThumbDrop').checked = false;
+    $('eFile').value = ''; $('eLink').value = r.link; $('eThumb').value = ''; $('eThumbDrop').checked = false;
+    const opener = (a, v) => { const ok = /^https?:/i.test(v); a.hidden = !ok; if (ok) a.href = v; };
+    opener($('eLinkOpen'), r.link); opener($('eUrlOpen'), r.link);
+    $('eLink').oninput = () => opener($('eLinkOpen'), $('eLink').value.trim());
+    $('eUrl').oninput = () => opener($('eUrlOpen'), $('eUrl').value.trim());
+    const now = stateOf(r);
+    $('eWhy').hidden = !now.why;
+    $('eWhy').className = `mat__why ${now.cls}`;
+    $('eWhy').textContent = now.why ? `지금 상태: ${now.why}` : '';
     const fileKind = ['pdf', 'intro', 'stageintro'].indexOf(r.kind) >= 0;
     $('eGroupF').hidden = r.kind === 'intro' || isStageIntro;
     $('eTitleF').hidden = r.kind === 'intro' || isStageIntro;
@@ -829,8 +843,9 @@
     try {
       const f = $('eFile').files[0];
       const link = $('eLink').value.trim();
-      if (f && link) throw new Error('파일과 링크 중 하나만 넣어 주세요.');
-      if (link) p.link = link;
+      const newLink = !$('eFileF').hidden && link && link !== editing.link;
+      if (f && newLink) throw new Error('새 링크와 파일 중 하나만 넣어 주세요.');
+      if (newLink) p.link = link;
       if (f) {
         if (f.size > MAX) throw new Error('45MB가 넘는 파일은 올릴 수 없어요.');
         p.file = await readFile(f);
