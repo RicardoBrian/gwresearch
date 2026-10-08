@@ -53,6 +53,10 @@
   .linkrow input { flex: 1; min-width: 0; }
   .linkrow .btn { flex: none; text-decoration: none; color: var(--ink); }
   #eWhy { margin: 0 0 14px; }
+  .gchips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .gchips:empty { display: none; }
+  .gchip { padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .gchip[aria-pressed="true"] { border-color: var(--green); background: var(--green); color: #fff; }
   .srcs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
   .hint { display: block; margin-top: 6px; color: var(--muted); font-size: 13px; }
   .files { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
@@ -178,13 +182,14 @@
         <div class="kinds">
           <label class="kind"><input type="radio" name="kind" value="pdf" checked><span>PDF 문서</span></label>
           <label class="kind"><input type="radio" name="kind" value="intro"><span>카드뉴스(소개)</span></label>
-          <label class="kind"><input type="radio" name="kind" value="video"><span>유튜브 영상</span></label>
+          <label class="kind"><input type="radio" name="kind" value="video"><span>영상 (유튜브·드라이브)</span></label>
           <label class="kind"><input type="radio" name="kind" value="web"><span>웹사이트·웹앱</span></label>
         </div>
       </div>
 
-      <label class="field" data-for="pdf video web"><span>분류 <small>(선택 · 예: 국어, 1학년)</small></span>
-        <input type="text" id="group" list="groups" autocomplete="off"></label>
+      <div class="field" data-for="pdf video web"><span>분류 <small>(선택 · 예: 국어, 1학년 · 같은 분류끼리 사이트에서 한 카드로 묶여요)</small></span>
+        <div class="gchips" id="gchips"></div>
+        <input type="text" id="group" list="groups" autocomplete="off" placeholder="새 분류는 직접 적기 · 없으면 비워 두기"></div>
       <datalist id="groups"></datalist>
 
       <label class="field" data-for="pdf video web"><span>제목 <small id="titleHint">(비우면 파일 이름)</small></span>
@@ -318,6 +323,7 @@
       syncItems(); syncKind();
       openTab('up');
       refreshShip();
+      preload();
     } catch (e) {
       if (!$('login').hidden) return;
       $('loading').innerHTML = `<div>${esc(e.message)}</div><button class="btn" onclick="location.reload()">다시 시도</button>`;
@@ -351,11 +357,25 @@
   function groupsOf(item) {
     const set = new Set();
     (data ? data.rows : []).forEach((r) => { if (r.item === item && r.group && r.group !== '소개') set.add(r.group); });
-    $('groups').innerHTML = [...set].map((g) => `<option value="${esc(g)}">`).join('');
+    const names = [...set];
+    $('groups').innerHTML = names.map((g) => `<option value="${esc(g)}">`).join('');
+    return names;
   }
-  function syncItems() { fillItems($('item'), $('stage').value, true); syncKind(); }
+  /* 올리기 화면: 이 항목에 이미 있는 분류를 버튼으로 */
+  function drawGroupChips() {
+    const names = groupsOf($('item').value);
+    const cur = $('group').value.trim();
+    $('gchips').innerHTML = names.length ? `<span class="hint">이 항목의 분류:</span>` + names.map((g) =>
+      `<button type="button" class="gchip" data-g="${esc(g)}" aria-pressed="${g === cur}">${esc(g)}</button>`).join('') : '';
+    $('gchips').querySelectorAll('[data-g]').forEach((b) => b.addEventListener('click', () => {
+      $('group').value = $('group').value.trim() === b.dataset.g ? '' : b.dataset.g;
+      drawGroupChips();
+    }));
+  }
+  $('group').addEventListener('input', () => drawGroupChips());
+  function syncItems() { fillItems($('item'), $('stage').value, true); syncKind(); drawGroupChips(); }
   $('stage').addEventListener('change', syncItems);
-  $('item').addEventListener('change', () => { syncKind(); groupsOf($('item').value); });
+  $('item').addEventListener('change', () => { syncKind(); drawGroupChips(); });
 
   const kind = () => document.querySelector('input[name=kind]:checked').value;
   function syncKind() {
@@ -480,12 +500,13 @@
           drawFiles(result);
         }
         const failed = result.filter((r) => !r.ok).length;
+        if (files.length - failed) changed(files.length - failed);
         if (failed) {
           fail('upErr', `${files.length}개 중 ${failed}개를 올리지 못했어요. 빨간 줄의 이유를 확인해 주세요.`);
           files = files.filter((_, i) => !result[i].ok);
           if (src() === 'link') $('links').value = files.map((f) => f.link).join('\n');
         } else {
-          toast(`${files.length}개 올렸어요. 다 올리면 [사이트에 반영하기]를 눌러 주세요.`); changed(files.length);
+          toast(`${files.length}개 올렸어요. 다 올리면 [사이트에 반영하기]를 눌러 주세요.`);
           files = []; $('links').value = ''; resetText();
         }
       } else {
@@ -500,7 +521,7 @@
         toast('올렸어요. 다 올리면 [사이트에 반영하기]를 눌러 주세요.'); changed(1);
         resetText();
       }
-      data = null;
+      preload();
     } catch (err) {
       fail('upErr', err.message);
     } finally {
@@ -519,6 +540,18 @@
   /* 머리글 높이(버튼 줄 때문에 화면마다 다름) → 목차·이동 위치 기준 */
   const setHead = () => document.documentElement.style.setProperty('--head', `${document.querySelector('header').offsetHeight}px`);
   new ResizeObserver(setHead).observe(document.querySelector('header'));
+
+  /* 목록을 뒤에서 받아 둠 (기기에 저장된 것 먼저) */
+  async function preload() {
+    try { const c = JSON.parse(store.get('listCache') || 'null'); if (c && c.rows && !data) data = c; } catch (e) { /* 없음 */ }
+    drawGroupChips();
+    try {
+      const d = await call('list');
+      store.set('listCache', JSON.stringify(d));
+      if ($('list').hidden) { data = d; lists = d.stages; if (d.deploy) { dep = d.deploy; drawShip(); } }
+      drawGroupChips();
+    } catch (e) { /* 목록 탭에서 다시 받음 */ }
+  }
 
   /* ---- 사이트 반영 버튼: 바뀐 걸 모아서 한 번에 배포 ---- */
   let dep = { lastDeploy: 0, dirty: 0, building: false };
@@ -554,7 +587,7 @@
 
   /* 목록은 지난번 것을 바로 보여 주고(기기에 저장), 뒤에서 조용히 새로 받아 바꿈.
      점검은 서버에 저장된 결과(30분마다 자동 점검)를 쓰고, 30분이 지난 줄만 다시 점검 */
-  const FRESH = 30 * 60 * 1000;
+  const FRESH = 90 * 60 * 1000;
   let busy = false;
 
   function useList(d) {

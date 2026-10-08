@@ -91,7 +91,9 @@ def read_rows():
         if text.startswith("오류:"):  # 앱 주소(?csv=코드)로 읽을 때 코드가 틀린 경우
             sys.exit(text.strip() + " Cloudflare 의 SHEET_CSV_URL 끝 코드를 업로드 코드와 맞춰 주세요.")
         if text.lstrip().startswith("<"):
-            sys.exit("오류: 시트 주소가 CSV가 아닙니다. '웹에 게시'에서 형식을 CSV로 골라 나온 주소를 넣어 주세요.")
+            sys.exit("오류: SHEET_CSV_URL 에서 시트 내용 대신 웹 페이지가 왔습니다. "
+                     "올리기 앱 주소(…/exec?csv=코드)라면 앱을 '액세스: 모든 사용자'로 배포했는지, "
+                     "'웹에 게시' 주소라면 형식을 CSV로 골랐는지 확인해 주세요.")
     else:
         path = ROOT / "data" / "materials.csv"
         print(f"파일 읽는 중: {path.relative_to(ROOT)}")

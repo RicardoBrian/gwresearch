@@ -81,7 +81,9 @@ function setUploadCode() {
   props_().setProperty('UPLOAD_CODE', code);
   props_().setProperty('SHEET_ID', SpreadsheetApp.getActiveSpreadsheet().getId());
   const url = ScriptApp.getService().getUrl();
-  ui.alert('업로드 코드를 저장했습니다.\n\n앱 주소: ' + (url || '(아직 웹앱으로 배포하지 않았습니다)'));
+  ui.alert('업로드 코드를 저장했습니다.\n\n앱 주소: ' + (url || '(아직 웹앱으로 배포하지 않았습니다)')
+    + (url ? '\n\n코드를 바꿨다면 Cloudflare 의 SHEET_CSV_URL 도 아래로 바꿔 주세요 (안 바꾸면 사이트 반영이 멈춤):\n'
+      + url + '?csv=' + encodeURIComponent(code) : ''));
 }
 
 // =========================================================
@@ -221,14 +223,18 @@ function isWeb_(v) {
   v = String(v || '').trim();
   return /^https?:\/\/\S+$/i.test(v) || /^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/.test(v);
 }
-// 웹 주소에 실제로 접속되는지 (주소가 없는 사이트면 오류 문장, 되면 '')
-function webError_(url) {
+// 웹 주소에 실제로 접속되는지 → null(됨) | {s:'bad'(주소가 없음) | 'warn'(지금 안 됨), why}
+function webCheck_(url) {
   if (!/^https?:\/\//i.test(url)) url = 'https:' + '/' + '/' + url;
+  try { url = encodeURI(decodeURI(url)); } catch (e) { /* 그대로 */ }  // 한글 주소
   try {
     UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true, validateHttpsCertificates: false });
-    return '';
+    return null;
   } catch (e) {
-    return '웹 주소에 접속할 수 없어요. 주소를 확인해 주세요 (www 를 빼거나 붙여 보기, 브라우저 주소창에서 열어 보기).';
+    if (/DNS|Address unavailable|unknown host/i.test(String(e.message))) {
+      return { s: 'bad', why: '없는 웹 주소예요. 주소를 확인해 주세요 (www 를 빼거나 붙여 보기, 브라우저 주소창에서 열어 보기).' };
+    }
+    return { s: 'warn', why: '지금 웹 주소에 접속이 안 돼요. 잠시 뒤 다시 점검해 보세요.' };
   }
 }
 
@@ -341,6 +347,7 @@ function expand_(link) {
   const it = folder.getFiles();
   while (it.hasNext()) {
     const f = it.next();
+    if (f.isTrashed()) continue;
     if (f.getMimeType() === MimeType.PDF) files.push({ name: f.getName(), link: fileUrl_(f) });
     else skipped.push(f.getName());
   }
@@ -384,7 +391,7 @@ function deployNow_() {
   }
   const p = props_();
   const last = Number(p.getProperty('LAST_DEPLOY_AT') || 0);
-  if (Date.now() - last < 60 * 1000) return deployState_(); // 1분 안에 또 누르면 한 번만
+  if (Date.now() - last < 15 * 1000) return deployState_(); // 두 번 누름 방지
   const res = UrlFetchApp.fetch(DEPLOY_HOOK, { method: 'post', muteHttpExceptions: true });
   if (res.getResponseCode() !== 200) {
     throw new Error(`사이트 반영 요청이 실패했습니다 (${res.getResponseCode()}). 잠시 뒤 다시 눌러 주세요.`);
@@ -458,19 +465,28 @@ function putStatus_(map) {
   if (Object.keys(vals).length) CacheService.getScriptCache().putAll(vals, 21600);
 }
 
+// 자동 점검 예약: 1시간마다 (예전 버전의 30분 예약은 바꿔 줌)
 function ensureStatusTrigger_() {
-  if (ScriptApp.getProjectTriggers().some((t) => t.getHandlerFunction() === 'refreshStatus')) return;
-  ScriptApp.newTrigger('refreshStatus').timeBased().everyMinutes(30).create();
+  const p = props_();
+  const mine = ScriptApp.getProjectTriggers().filter((t) => t.getHandlerFunction() === 'refreshStatus');
+  if (mine.length && p.getProperty('STATUS_TRIGGER') === 'hourly') return;
+  mine.forEach((t) => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('refreshStatus').timeBased().everyHours(1).create();
+  p.setProperty('STATUS_TRIGGER', 'hourly');
 }
 
-// 30분마다 (앱을 안 열어도) 모든 줄 점검해 두기 — 실행 시간 제한 안쪽으로 4분까지
+// 1시간마다 (앱을 안 열어도) 점검해 두기 — 2분까지, 점검한 지 오래된 줄부터
+// (개인 구글 계정은 예약 실행이 하루 90분까지라 짧게)
 function refreshStatus() {
   const start = Date.now();
   const t = table_();
   const st = stages_();
+  const rows = rows_(t);
+  const saved = getStatus_(rows.map((r) => r.uid));
+  rows.sort((a, b) => ((saved[a.uid] || {}).t || 0) - ((saved[b.uid] || {}).t || 0));
   const out = {};
-  for (const r of rows_(t)) {
-    if (Date.now() - start > 4 * 60 * 1000) break;
+  for (const r of rows) {
+    if (Date.now() - start > 2 * 60 * 1000) break;
     try { out[r.uid] = Object.assign(checkRow_(r, st), { t: Date.now() }); } catch (e) { /* 다음 번에 */ }
   }
   putStatus_(out);
@@ -511,8 +527,8 @@ function checkRow_(r, stages) {
     if (!id) return bad('드라이브 PDF 링크가 아니에요');
     res = checkFile_(id, true, kind === 'pdf');
   } else if (kind === 'web') {
-    const werr = webError_(r.file);
-    if (werr) return bad(werr);
+    const w = webCheck_(r.file);
+    if (w) res = w;
   } else if (kind === 'gdoc') {
     const f = openFile_(gdocId_(r.file));
     if (!f || !shared_(f)) res = { s: 'warn', why: '구글 문서 공유가 꺼져 있어 사이트에서 "액세스 필요"로 보여요', fix: f && mine_(f) ? 'share' : '' };
@@ -592,8 +608,8 @@ function upload_(p) {
       let url = String(p.url || '').trim();
       if (!isWeb_(url)) throw new Error('웹 주소를 알아볼 수 없어요. (예: https://…)');
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-      const werr = webError_(url);
-      if (werr) throw new Error(werr);
+      const w = webCheck_(url);
+      if (w && w.s === 'bad') throw new Error(w.why);
       row.file = url;
       if (p.thumb) {
         const f = publish_(folderFor_(v.stage, v.item, '썸네일').createFile(blob_(p.thumb, false)));
@@ -603,9 +619,23 @@ function upload_(p) {
     } else {
       throw new Error('자료 종류를 골라 주세요.');
     }
-    row.uid = newId_();
     row.at = new Date();
-    withLock_(() => writeRow_(table_(), 0, row));
+    const t = table_();
+    // 카드뉴스는 항목(또는 단계)마다 하나만 쓰임 → 이미 있으면 새 줄 대신 그 줄을 바꿈
+    const old = p.kind === 'intro' ? rows_(t).find((r) => {
+      const k = kindOf_(r);
+      return v.stageIntro ? k === 'stageintro' && stageKey_(r.stage) === stageKey_(v.stage)
+        : k === 'intro' && norm_(r.item) === norm_(v.item);
+    }) : null;
+    if (old) {
+      row.uid = old.uid;
+      withLock_(() => writeRow_(t, findRow_(t, old.uid), { file: row.file, by: row.by, at: row.at, stage: row.stage }));
+      const prev = openFile_(driveId_(old.file));
+      if (prev && inRoot_(prev)) prev.setTrashed(true);
+    } else {
+      row.uid = newId_();
+      withLock_(() => writeRow_(t, 0, row));
+    }
     // 올리면서 공유·형식을 다 확인했으므로 바로 '정상'
     putStatus_({ [row.uid]: { s: 'ok', t: Date.now() } });
   } catch (e) {
@@ -658,8 +688,8 @@ function update_(p) {
         if (!isWeb_(url)) throw new Error('웹 주소를 알아볼 수 없어요.');
         data.file = /^https?:\/\//i.test(url) ? url : 'https://' + url;
         if (kind === 'web' && data.file !== cur.file) {
-          const werr = webError_(data.file);
-          if (werr) throw new Error(werr);
+          const w = webCheck_(data.file);
+          if (w && w.s === 'bad') throw new Error(w.why);
         }
       }
     }
@@ -698,10 +728,13 @@ function remove_(uid) {
     if (n) t.sh.deleteRow(n);
   });
   // 앱이 만든 파일만 휴지통으로 (30일 안에 되살릴 수 있음)
-  [driveId_(cur.file), driveId_(cur.thumb)].filter(Boolean).forEach((id) => {
+  [driveId_(cur.file), driveId_(cur.youtube), driveId_(cur.thumb)].filter(Boolean).forEach((id) => {
     const f = openFile_(id);
     if (f && inRoot_(f)) f.setTrashed(true);
   });
+  if (folderId_(cur.file)) {
+    try { const d = DriveApp.getFolderById(folderId_(cur.file)); if (inRoot_(d)) d.setTrashed(true); } catch (e) { /* 이미 없음 */ }
+  }
   markDirty_();
   return { ok: true };
 }
