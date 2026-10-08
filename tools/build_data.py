@@ -33,7 +33,9 @@ import json
 import os
 import pathlib
 import re
+import socket
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -228,6 +230,11 @@ def probe_web(url):
             csp = (r.headers.get("Content-Security-Policy") or "").lower()
             html = r.read(300_000).decode("utf-8", "replace")
             final = r.geturl()
+    except urllib.error.URLError as e:
+        # 주소 자체가 없음(예: www 를 잘못 붙임) → 고칠 것. 그 밖의 접속 실패는 일단 띄워 봄
+        if isinstance(e.reason, socket.gaierror):
+            return "", True, "", "nohost"
+        return "", True, ""
     except Exception:  # noqa: BLE001  (확인 못 하면 일단 띄워 봄)
         return "", True, ""
     m = re.search(r"<title[^>]*>(.*?)</title>", html, re.S | re.I)
@@ -502,7 +509,12 @@ def main():
                     # 드라이브 미리보기 그림 (공유가 꺼져 있으면 사이트에서 기본 그림으로 대신함)
                     page_title, embed, image = "", True, f"https://drive.google.com/thumbnail?id={gdoc.group(1)}&sz=w800"
                 else:
-                    page_title, embed, image = probe_web(f)
+                    got = probe_web(f)
+                    if len(got) > 3:
+                        errors.append(f"{where}: 웹 주소 '{urllib.parse.urlsplit(f).hostname}'를 찾을 수 없습니다. "
+                                      "주소를 확인해 주세요 (www 를 빼거나 붙여 보기, 브라우저 주소창에서 열어 보기).")
+                        continue
+                    page_title, embed, image = got
                 # 제목 칸이 비면 사이트 제목 → 사이트 주소(분류 이름을 제목으로 쓰면 '웹' 같은 카드가 여러 개 생김)
                 title = row.get("title") or page_title or urllib.parse.urlsplit(f).hostname or "웹 페이지"
                 m.update(type="web", url=f, embed=embed and f.lower().startswith("https://"))

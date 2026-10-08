@@ -221,6 +221,17 @@ function isWeb_(v) {
   v = String(v || '').trim();
   return /^https?:\/\/\S+$/i.test(v) || /^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/.test(v);
 }
+// 웹 주소에 실제로 접속되는지 (주소가 없는 사이트면 오류 문장, 되면 '')
+function webError_(url) {
+  if (!/^https?:\/\//i.test(url)) url = 'https:' + '/' + '/' + url;
+  try {
+    UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true, validateHttpsCertificates: false });
+    return '';
+  } catch (e) {
+    return '웹 주소에 접속할 수 없어요. 주소를 확인해 주세요 (www 를 빼거나 붙여 보기, 브라우저 주소창에서 열어 보기).';
+  }
+}
+
 function fileUrl_(f) { return `https://drive.google.com/file/d/${f.getId()}/view`; }
 
 // 행의 자료 종류
@@ -495,6 +506,9 @@ function checkRow_(r, stages) {
     const id = driveId_(r.file);
     if (!id) return bad('드라이브 PDF 링크가 아니에요');
     res = checkFile_(id, true);
+  } else if (kind === 'web') {
+    const werr = webError_(r.file);
+    if (werr) return bad(werr);
   } else if (kind === 'gdoc') {
     const f = openFile_(gdocId_(r.file));
     if (!f || !shared_(f)) res = { s: 'warn', why: '구글 문서 공유가 꺼져 있어 사이트에서 "액세스 필요"로 보여요', fix: f && mine_(f) ? 'share' : '' };
@@ -560,6 +574,8 @@ function upload_(p) {
       let url = String(p.url || '').trim();
       if (!isWeb_(url)) throw new Error('웹 주소를 알아볼 수 없어요. (예: https://…)');
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      const werr = webError_(url);
+      if (werr) throw new Error(werr);
       row.file = url;
       if (p.thumb) {
         const f = publish_(folderFor_(v.stage, v.item, '썸네일').createFile(blob_(p.thumb, false)));
@@ -623,6 +639,10 @@ function update_(p) {
       } else {
         if (!isWeb_(url)) throw new Error('웹 주소를 알아볼 수 없어요.');
         data.file = /^https?:\/\//i.test(url) ? url : 'https://' + url;
+        if (kind === 'web' && data.file !== cur.file) {
+          const werr = webError_(data.file);
+          if (werr) throw new Error(werr);
+        }
       }
     }
     // 썸네일 (웹)
