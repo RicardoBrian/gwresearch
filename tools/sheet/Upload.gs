@@ -2,27 +2,28 @@
  * 자료 올리기 앱 (웹앱) + 기존 자료 정리
  * Apps Script 파일: Upload.gs(이 파일), UploadPage.html, Migrate.html
  * Code.gs 의 DEPLOY_HOOK(배포 후크 주소)을 같이 씀
+ * 맨 위 값들은 var (같은 코드가 프로젝트에 두 번 들어가도 "already been declared" 로 멈추지 않게)
  *
  * - 시트가 그대로 저장소. 앱은 시트 '자료' 탭에 사람이 넣는 것과 같은 형식으로 쓰고 읽음
  * - 파일은 이 스크립트 주인 드라이브의 '연구학교 자료/단계/항목/(분류)' 폴더에 저장하고 공유를 엶
  * - 중간에 실패하면 만든 파일을 휴지통으로 보내고 시트는 건드리지 않음
  * - 바뀐 게 있으면 1분 뒤 사이트 반영 (여러 번 바꿔도 한 번만)
  */
-const ROOT_NAME = '연구학교 자료';
-const DATA_SHEET = '자료';
-const LIST_SHEET = '목록';
-const STAGE_INTRO = '단계 소개';
-const MAX_BYTES = 45 * 1024 * 1024; // 앱스스크립트로 한 번에 받을 수 있는 크기 안쪽
+var ROOT_NAME = '연구학교 자료';
+var DATA_SHEET = '자료';
+var LIST_SHEET = '목록';
+var STAGE_INTRO = '단계 소개';
+var MAX_BYTES = 45 * 1024 * 1024; // 앱스스크립트로 한 번에 받을 수 있는 크기 안쪽
 
 // 시트 열 제목 → 내부 이름 (사이트 배포 tools/build_data.py 와 같은 규칙)
-const KEYS = {
+var KEYS = {
   stage: ['단계'], item: ['항목', '항목id', 'id'], group: ['분류'], sub: ['소분류'], title: ['제목'],
   file: ['pdf링크', 'pdf', '파일', '파일링크', '링크'], youtube: ['유튜브링크', '유튜브'], desc: ['설명'],
   thumb: ['썸네일', '썸네일링크', '대표이미지'],
   by: ['올린사람'], uid: ['관리번호'], at: ['수정시각'], prev: ['이전링크'],
 };
 // 앱이 쓰는 열 — 없으면 맨 오른쪽에 만듦 (사이트 배포는 이 열들을 무시하거나 썸네일만 읽음)
-const EXTRA = { thumb: '썸네일', by: '올린 사람', uid: '관리번호', at: '수정 시각', prev: '이전 링크' };
+var EXTRA = { thumb: '썸네일', by: '올린 사람', uid: '관리번호', at: '수정 시각', prev: '이전 링크' };
 
 // =========================================================
 // 웹앱 입구
@@ -186,8 +187,8 @@ function stages_() {
   return out;
 }
 
-const norm_ = (s) => String(s || '').replace(/\s+/g, '');
-const stageKey_ = (s) => norm_(String(s || '').replace(/^\d+/, ''));
+var norm_ = (s) => String(s || '').replace(/\s+/g, '');
+var stageKey_ = (s) => norm_(String(s || '').replace(/^\d+/, ''));
 
 // =========================================================
 // 링크 알아보기 (build_data.py 와 같은 규칙)
