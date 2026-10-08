@@ -31,6 +31,7 @@
   <button onclick="google.script.host.close()">닫기</button>
 </div>
 <script>
+  /* 앱스스크립트는 스크립트 안의 슬래시 두 개를 주석으로 잘못 읽을 수 있어 쓰지 않음 (주소는 https:\/\/ 로) */
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const run = (fn, ...args) => new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
@@ -59,7 +60,6 @@
     $('run').disabled = true; $('undo').disabled = true;
     const todo = plan.filter((p) => !p.problem);
     let done = 0, failed = 0;
-    // 3줄씩 (복사는 시간이 걸려서 실행 시간 제한 안쪽으로)
     for (let i = 0; i < todo.length; i += 3) {
       const part = todo.slice(i, i + 3);
       part.forEach((p) => { p.status = '복사 중…'; }); draw();
