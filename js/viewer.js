@@ -746,6 +746,15 @@
       p.el = el;
       return el;
     }));
+    // 첫 쪽이 다 그려질 때까지는 '불러오는 중'만 (빈 종이가 먼저 보이지 않게)
+    holder.style.visibility = 'hidden';
+    scroller.insertAdjacentHTML('afterbegin', LOADING.replace('class="loading"', 'class="loading loading--over"'));
+    const reveal = () => {
+      if (!holder.style.visibility) return;
+      holder.style.visibility = '';
+      scroller.querySelector('.loading--over')?.remove();
+    };
+    setTimeout(() => alive && reveal(), 5000); // 혹시 첫 쪽이 늦어도 5초 뒤엔 보여줌
     relayout();
     ro.observe(scroller);
 
@@ -790,8 +799,9 @@
         p.el.replaceChildren(canvas);
         p.el.classList.remove('is-skeleton');
         p.drawnAt = cssW;
+        if (p === pages[0]) reveal();
       } catch (err) {
-        if (alive) console.error(err);
+        if (alive) { console.error(err); reveal(); }
       } finally {
         p.busy = false;
         if (p.again && alive) { p.again = false; draw(p); }

@@ -51,10 +51,12 @@ COLS = {
     "PDF 링크": "file", "PDF": "file", "파일": "file",
     "유튜브 링크": "youtube", "유튜브": "youtube",
     "설명": "desc",
+    "썸네일": "thumb", "썸네일 링크": "thumb", "대표 이미지": "thumb",
 }
 NORM_COLS = {re.sub(r"\s+", "", k).lower(): v for k, v in COLS.items()}
 KEY_NAMES = {"stage": "단계", "item": "항목", "group": "분류", "sub": "소분류", "title": "제목",
-             "file": "PDF 링크", "youtube": "유튜브 링크", "desc": "설명"}
+             "file": "PDF 링크", "youtube": "유튜브 링크", "desc": "설명",
+             "thumb": "썸네일"}
 UA = {"User-Agent": "Mozilla/5.0 (gwresearch build)"}
 
 
@@ -496,6 +498,15 @@ def main():
                     page_title, embed, image = probe_web(f)
                 title = row.get("title") or page_title or row.get("group") or "웹 페이지"
                 m.update(type="web", url=f, embed=embed and f.lower().startswith("https://"))
+                # 시트 '썸네일' 칸(드라이브 그림 파일 또는 그림 주소)이 있으면 그것을 먼저
+                thumb = row.get("thumb", "")
+                if thumb:
+                    if drive_id(thumb):
+                        image = f"https://drive.google.com/thumbnail?id={drive_id(thumb)}&sz=w800"
+                    elif web_url(thumb).startswith("https://"):
+                        image = web_url(thumb)
+                    else:
+                        warnings.append(f"{where}: 썸네일 링크를 알아볼 수 없어 기본 그림으로 보입니다 (드라이브 그림 파일 링크를 넣어 주세요).")
                 if image:
                     m["image"] = image
             elif drive_id(f):

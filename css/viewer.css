@@ -528,6 +528,7 @@ html.has-modal { overflow: hidden; }
 .pdf__tools .btn--solid { margin-left: 4px; }
 
 .pdf__scroll {
+  position: relative;
   overflow: auto;
   background: var(--paper);
   outline: none;
@@ -558,13 +559,13 @@ html.has-modal { overflow: hidden; }
   height: 100%;
 }
 
+/* 아직 안 그린 쪽: 반짝임 없이 흰 종이 (빨리 내릴 때만 잠깐 보임) */
 .pdf__sheet.is-skeleton {
   aspect-ratio: 210 / 297;
-  background: linear-gradient(100deg, #fff 30%, #f1f4ec 50%, #fff 70%) 0 0 / 300% 100%;
-  animation: shimmer 1.4s linear infinite;
+  background: #fff;
 }
 
-@keyframes shimmer { to { background-position: -150% 0; } }
+.loading--over { position: absolute; inset: 0; z-index: 1; }
 
 /* ---------- 영상 ---------- */
 .video-wrap {
