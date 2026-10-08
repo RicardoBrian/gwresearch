@@ -1,7 +1,8 @@
 """자료 목록(구글 시트) → assets/data.json
 
 읽는 곳 (위에서부터 먼저 있는 것):
-  1. 환경변수 SHEET_CSV_URL  — 구글 시트 [파일 → 공유 → 웹에 게시 → CSV] 주소
+  1. 환경변수 SHEET_CSV_URL  — 올리기 앱 주소?csv=업로드코드 (실시간, 권장)
+                               또는 구글 시트 [파일 → 공유 → 웹에 게시 → CSV] 주소 (구글이 최대 5분 늦게 갱신)
   2. data/materials.csv       — 저장소에 둔 CSV (견본·로컬 테스트용)
 
 시트 '자료' 탭 열 (1행 제목, 순서는 상관없음):
@@ -85,6 +86,8 @@ def read_rows():
         except Exception as e:  # noqa: BLE001
             sys.exit(f"오류: 시트를 읽지 못했습니다 ({e}). 시트의 '웹에 게시'가 CSV로 되어 있는지, "
                      "게시한 탭을 지우거나 이름을 바꾸지 않았는지 확인해 주세요.")
+        if text.startswith("오류:"):  # 앱 주소(?csv=코드)로 읽을 때 코드가 틀린 경우
+            sys.exit(text.strip() + " Cloudflare 의 SHEET_CSV_URL 끝 코드를 업로드 코드와 맞춰 주세요.")
         if text.lstrip().startswith("<"):
             sys.exit("오류: 시트 주소가 CSV가 아닙니다. '웹에 게시'에서 형식을 CSV로 골라 나온 주소를 넣어 주세요.")
     else:
@@ -103,7 +106,11 @@ def read_rows():
         sys.exit("오류: 시트 1행에서 'PDF 링크'·'유튜브 링크' 열을 찾지 못했습니다. 열 제목을 확인해 주세요.")
     rows = []
     for values in reader:
-        rows.append({k: v.strip() for k, v in zip(header, values) if k})
+        row = {}
+        for k, v in zip(header, values):
+            if k and k not in row:  # 같은 뜻의 열이 둘이면 왼쪽 열 (올리기 앱과 같게)
+                row[k] = v.strip()
+        rows.append(row)
     return rows
 
 

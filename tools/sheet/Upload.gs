@@ -28,7 +28,10 @@ var EXTRA = { thumb: '썸네일', by: '올린 사람', uid: '관리번호', at: 
 // =========================================================
 // 웹앱 입구
 // =========================================================
-function doGet() {
+function doGet(e) {
+  // 사이트 배포가 시트를 실시간으로 읽는 주소: 앱주소?csv=업로드코드
+  // ('웹에 게시' CSV 는 구글이 최대 5분 늦게 갱신해서, 고치고 바로 반영하면 예전 내용이 올라감)
+  if (e && e.parameter && e.parameter.csv !== undefined) return csv_(e.parameter.csv);
   return HtmlService.createHtmlOutputFromFile('UploadPage')
     .setTitle('연구학교 자료 올리기')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -50,6 +53,16 @@ function api(code, action, p) {
     case 'deploy': return deployNow_();
   }
   throw new Error('알 수 없는 요청입니다.');
+}
+
+// 자료 탭 전체를 CSV 로 (보이는 값 그대로)
+function csv_(code) {
+  const out = (text) => ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.CSV);
+  const want = props_().getProperty('UPLOAD_CODE');
+  if (!want || String(code).trim() !== want) return out('오류: 시트 주소의 코드가 업로드 코드와 다릅니다.');
+  const sh = ss_().getSheetByName(DATA_SHEET);
+  const cell = (v) => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  return out(sh.getDataRange().getDisplayValues().map((r) => r.map((v) => cell(String(v))).join(',')).join('\r\n'));
 }
 
 function checkCode_(code) {

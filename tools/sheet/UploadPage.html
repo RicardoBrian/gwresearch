@@ -204,7 +204,7 @@
       </div>
 
       <label class="field" data-for="video web"><span id="urlLabel">주소</span>
-        <input type="url" id="url" autocomplete="off" placeholder="https://"></label>
+        <input type="text" inputmode="url" id="url" autocomplete="off" placeholder="https://"></label>
 
       <div class="field" data-for="web"><span>썸네일 그림 <small>(선택 · 웹앱 화면 캡처 · 가로로 긴 그림)</small></span>
         <input type="file" id="thumb" accept="image/*"></div>
@@ -228,7 +228,7 @@
 
 <!-- 수정 창 -->
 <dialog id="edit">
-  <form id="editForm" method="dialog">
+  <form id="editForm" method="dialog" novalidate>
     <div class="dlg__head">자료 고치기</div>
     <div class="dlg__body">
       <div class="row2">
@@ -238,7 +238,7 @@
       <label class="field" id="eGroupF"><span>분류</span><input type="text" id="eGroup" list="groups" autocomplete="off"></label>
       <label class="field" id="eTitleF"><span>제목</span><input type="text" id="eTitle" autocomplete="off"></label>
       <label class="field" id="eDescF"><span>설명</span><textarea id="eDesc"></textarea></label>
-      <label class="field" id="eUrlF"><span>주소</span><input type="url" id="eUrl" autocomplete="off"></label>
+      <label class="field" id="eUrlF"><span>주소</span><input type="text" inputmode="url" id="eUrl" autocomplete="off"></label>
       <div class="field" id="eFileF"><span>파일 바꾸기 <small>(PDF · 비우면 그대로 · 파일 또는 드라이브 링크 중 하나)</small></span>
         <input type="file" id="eFile" accept="application/pdf,.pdf">
         <input type="text" id="eLink" autocomplete="off" placeholder="또는 드라이브 파일 링크"></div>
