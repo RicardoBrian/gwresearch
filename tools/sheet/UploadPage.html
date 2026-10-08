@@ -43,6 +43,8 @@
   .drop { display: grid; place-items: center; gap: 4px; padding: 22px 12px; border: 2px dashed var(--line); border-radius: 12px; text-align: center; color: var(--muted); cursor: pointer; }
   .drop.is-over { border-color: var(--green); background: var(--green-soft); }
   .drop b { color: var(--green); }
+  .srcs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .hint { display: block; margin-top: 6px; color: var(--muted); font-size: 13px; }
   .files { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
   .files li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; border-radius: 8px; background: var(--paper); font-size: 14px; }
   .files li.is-bad { background: var(--bad-soft); color: var(--bad); }
@@ -148,6 +150,14 @@
         <textarea id="desc"></textarea></label>
 
       <div class="field" data-for="pdf intro"><span>파일 <small id="fileHint">(PDF · 여러 개 한 번에 가능 · 1개 45MB까지)</small></span>
+        <div class="srcs">
+          <label class="kind"><input type="radio" name="src" value="file" checked><span>내 컴퓨터에서 올리기</span></label>
+          <label class="kind"><input type="radio" name="src" value="link"><span>드라이브 링크로 가져오기</span></label>
+        </div>
+        <div id="linkBox" hidden>
+          <textarea id="links" placeholder="drive.google.com/file/d/… 또는 drive.google.com/drive/folders/…&#10;여러 개면 한 줄에 하나씩 · 폴더 링크는 안의 PDF를 모두 가져와요"></textarea>
+          <small class="hint">파일은 선생님 드라이브 '연구학교 자료' 폴더로 <b>복사</b>되고 공유가 자동으로 열려요. 원래 파일은 그대로예요. 링크의 공유가 꺼져 있으면 가져올 수 없어요.</small>
+        </div>
         <label class="drop" id="drop"><input type="file" id="file" accept="application/pdf,.pdf" multiple hidden>
           <span><b>파일 고르기</b> 또는 여기로 끌어다 놓기</span></label>
         <ul class="files" id="fileList"></ul>
@@ -186,7 +196,9 @@
       <label class="field" id="eTitleF"><span>제목</span><input type="text" id="eTitle" autocomplete="off"></label>
       <label class="field" id="eDescF"><span>설명</span><textarea id="eDesc"></textarea></label>
       <label class="field" id="eUrlF"><span>주소</span><input type="url" id="eUrl" autocomplete="off"></label>
-      <label class="field" id="eFileF"><span>파일 바꾸기 <small>(PDF · 비우면 그대로)</small></span><input type="file" id="eFile" accept="application/pdf,.pdf"></label>
+      <div class="field" id="eFileF"><span>파일 바꾸기 <small>(PDF · 비우면 그대로 · 파일 또는 드라이브 링크 중 하나)</small></span>
+        <input type="file" id="eFile" accept="application/pdf,.pdf">
+        <input type="text" id="eLink" autocomplete="off" placeholder="또는 드라이브 파일 링크"></div>
       <div class="field" id="eThumbF"><span>썸네일 그림 <small id="eThumbNow"></small></span>
         <input type="file" id="eThumb" accept="image/*">
         <label><input type="checkbox" id="eThumbDrop"> 썸네일 지우기</label></div>
@@ -313,6 +325,15 @@
   document.querySelectorAll('input[name=kind]').forEach((r) => r.addEventListener('change', syncKind));
 
   let files = [];
+  const src = () => document.querySelector('input[name=src]:checked').value;
+  function syncSrc() {
+    const link = src() === 'link';
+    $('linkBox').hidden = !link;
+    $('drop').hidden = link;
+    files = []; drawFiles();
+  }
+  document.querySelectorAll('input[name=src]').forEach((r) => r.addEventListener('change', syncSrc));
+
   function addFiles(list) {
     const pdfs = [...list].filter((f) => /\.pdf$/i.test(f.name) || f.type === 'application/pdf');
     if (pdfs.length < list.length) toast('PDF가 아닌 파일은 뺐어요. PDF로 저장해서 올려 주세요.');
@@ -322,9 +343,10 @@
   function drawFiles(result) {
     $('fileList').innerHTML = files.map((f, k) => {
       const r = result && result[k];
-      const big = f.size > MAX;
+      const big = !f.link && f.size > MAX;
       const cls = r ? (r.ok ? 'is-ok' : 'is-bad') : big ? 'is-bad' : '';
-      const note = r ? (r.ok ? '올림 ✓' : r.why) : big ? '45MB 초과 — 올릴 수 없어요' : `${(f.size / 1048576).toFixed(1)}MB <button type="button" class="btn btn--sm" data-rm="${k}">빼기</button>`;
+      const size = f.link ? '드라이브' : `${(f.size / 1048576).toFixed(1)}MB`;
+      const note = r ? (r.ok ? '올림 ✓' : r.why) : big ? '45MB 초과 — 올릴 수 없어요' : `${size} <button type="button" class="btn btn--sm" data-rm="${k}">빼기</button>`;
       return `<li class="${cls}"><span>${esc(f.name)}</span><span>${r || big ? esc(note) : note}</span></li>`;
     }).join('');
     $('fileList').querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => { files.splice(Number(b.dataset.rm), 1); drawFiles(); }));
@@ -359,7 +381,32 @@
     if (!base.item) return fail('upErr', '항목을 골라 주세요.');
     if (base.group === '소개') return fail('upErr', "분류에 '소개'는 쓸 수 없어요. 카드뉴스는 '카드뉴스(소개)'를 골라 주세요.");
     if (!base.by) return fail('upErr', '올린 사람 이름을 적어 주세요.');
-    if ((k === 'pdf' || k === 'intro') && !files.length) return fail('upErr', '파일을 골라 주세요.');
+    if ((k === 'pdf' || k === 'intro') && src() === 'link') {
+      const lines = $('links').value.split(/\s+/).map((x) => x.trim()).filter(Boolean);
+      if (!lines.length) return fail('upErr', '드라이브 링크를 넣어 주세요.');
+      if (k === 'intro' && lines.length > 1) return fail('upErr', '카드뉴스는 링크 1개만 넣어 주세요.');
+      $('upBtn').disabled = true; $('upBtn').textContent = '링크 확인 중…';
+      try {
+        files = [];
+        for (const line of lines) {
+          if (/drive\.google\.com\/drive\/(u\/\d+\/)?folders\/[\w-]/.test(line)) {
+            const r = await call('expand', line);
+            if (r.skipped.length) toast(`PDF가 아닌 파일 ${r.skipped.length}개는 뺐어요: ${r.skipped.slice(0, 3).join(', ')}`);
+            files = files.concat(r.files.map((x) => ({ name: x.name, link: x.link })));
+          } else {
+            files.push({ name: line.replace(/^.*\/d\/([\w-]{6})[\w-]*.*$/, '드라이브 파일 $1…'), link: line });
+          }
+        }
+      } catch (err) {
+        files = [];
+        return fail('upErr', err.message);
+      } finally {
+        $('upBtn').disabled = false; $('upBtn').textContent = '올리기';
+      }
+      if (k === 'intro' && files.length > 1) { files = []; return fail('upErr', '카드뉴스는 PDF 1개만 가져올 수 있어요. 폴더 대신 파일 링크를 넣어 주세요.'); }
+      drawFiles();
+    }
+    if ((k === 'pdf' || k === 'intro') && !files.length) return fail('upErr', src() === 'link' ? '가져올 PDF가 없어요.' : '파일을 골라 주세요.');
     if (files.some((f) => f.size > MAX) && (k === 'pdf' || k === 'intro')) return fail('upErr', '45MB가 넘는 파일은 빼 주세요.');
     const url = $('url').value.trim();
     if (k === 'video' && !/(youtu\.be\/|youtube\.com\/)/.test(url)) return fail('upErr', '유튜브 주소를 넣어 주세요.');
@@ -374,8 +421,8 @@
         for (let i = 0; i < files.length; i++) {
           btn.textContent = `올리는 중… ${i + 1} / ${files.length}`;
           try {
-            const file = await readFile(files[i]);
-            await call('upload', Object.assign({}, base, { file, title: files.length > 1 ? '' : base.title }));
+            const one = files[i].link ? { link: files[i].link } : { file: await readFile(files[i]) };
+            await call('upload', Object.assign({}, base, one, { title: files.length > 1 ? '' : base.title }));
             result[i] = { ok: true };
           } catch (err) {
             result[i] = { ok: false, why: err.message };
@@ -386,9 +433,10 @@
         if (failed) {
           fail('upErr', `${files.length}개 중 ${failed}개를 올리지 못했어요. 빨간 줄의 이유를 확인해 주세요.`);
           files = files.filter((_, i) => !result[i].ok);
+          if (src() === 'link') $('links').value = files.map((f) => f.link).join('\n');
         } else {
           toast(`${files.length}개 올렸어요. 약 1분 뒤 사이트에 반영돼요.`);
-          files = []; resetText();
+          files = []; $('links').value = ''; resetText();
         }
       } else {
         btn.textContent = '올리는 중…';
@@ -566,7 +614,7 @@
     $('eGroup').value = r.group === '소개' ? '' : r.group;
     $('eTitle').value = r.title; $('eDesc').value = r.desc;
     $('eUrl').value = r.link;
-    $('eFile').value = ''; $('eThumb').value = ''; $('eThumbDrop').checked = false;
+    $('eFile').value = ''; $('eLink').value = ''; $('eThumb').value = ''; $('eThumbDrop').checked = false;
     const fileKind = ['pdf', 'intro', 'stageintro'].indexOf(r.kind) >= 0;
     $('eGroupF').hidden = r.kind === 'intro' || isStageIntro;
     $('eTitleF').hidden = r.kind === 'intro' || isStageIntro;
@@ -594,6 +642,9 @@
     btn.disabled = true; btn.textContent = '저장 중…';
     try {
       const f = $('eFile').files[0];
+      const link = $('eLink').value.trim();
+      if (f && link) throw new Error('파일과 링크 중 하나만 넣어 주세요.');
+      if (link) p.link = link;
       if (f) {
         if (f.size > MAX) throw new Error('45MB가 넘는 파일은 올릴 수 없어요.');
         p.file = await readFile(f);

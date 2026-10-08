@@ -44,6 +44,7 @@ function api(code, action, p) {
     case 'update': return update_(p);
     case 'remove': return remove_(p);
     case 'fix': return fix_(p);
+    case 'expand': return expand_(p);
   }
   throw new Error('알 수 없는 요청입니다.');
 }
@@ -284,6 +285,40 @@ function inRoot_(x) {
 
 function openFile_(id) { try { return DriveApp.getFileById(id); } catch (e) { return null; } }
 
+// 드라이브 링크의 PDF를 폴더로 복사 → {f: 복사본, name: 원래 이름}
+function copyFromLink_(link, folder) {
+  const id = driveId_(link);
+  if (!id) {
+    if (gdocId_(link)) throw new Error("구글 문서·시트·슬라이드는 PDF가 아니에요. '웹사이트·웹앱'으로 올리거나 PDF로 저장해 주세요.");
+    throw new Error('드라이브 파일 링크가 아니에요. (drive.google.com/file/d/… 형태)');
+  }
+  const src = openFile_(id);
+  if (!src) throw new Error("파일을 열 수 없어요. 공유를 '링크가 있는 모든 사용자'로 바꾸거나, 파일을 내려받아 [내 컴퓨터에서 올리기]로 올려 주세요.");
+  if (src.getMimeType() !== MimeType.PDF) throw new Error(`PDF가 아니에요 (${src.getName()}). PDF로 저장해서 올려 주세요.`);
+  return { f: src.makeCopy(src.getName(), folder), name: src.getName() };
+}
+
+// 폴더 링크 → 안의 PDF 목록 (이름순) {files:[{name, link}], skipped:[이름]}
+function expand_(link) {
+  const id = folderId_(link);
+  let folder;
+  try { folder = DriveApp.getFolderById(id); } catch (e) {
+    throw new Error("폴더를 열 수 없어요. 폴더 공유를 '링크가 있는 모든 사용자'로 바꿔 주세요.");
+  }
+  const files = [];
+  const skipped = [];
+  const it = folder.getFiles();
+  while (it.hasNext()) {
+    const f = it.next();
+    if (f.getMimeType() === MimeType.PDF) files.push({ name: f.getName(), link: fileUrl_(f) });
+    else skipped.push(f.getName());
+  }
+  const key = (n) => n.replace(/\d+/g, (d) => d.padStart(8, '0')).toLowerCase();
+  files.sort((a, b) => (key(a.name) < key(b.name) ? -1 : 1));
+  if (!files.length) throw new Error('폴더 안에 PDF가 없어요.');
+  return { files, skipped };
+}
+
 function cleanTitle_(name) {
   name = String(name).trim().replace(/\s*의 사본$/, '').replace(/^(?:Copy of|사본)\s+/, '');
   name = name.replace(/\.(pdf|png|jpe?g|gif|webp)$/i, '');
@@ -447,10 +482,11 @@ function upload_(p) {
     if (p.kind === 'pdf' || p.kind === 'intro') {
       if (p.kind === 'intro') row.group = v.stageIntro ? '' : '소개';
       const folder = folderFor_(v.stage, v.item, p.kind === 'intro' ? (v.stageIntro ? '' : '소개') : row.group);
-      const f = publish_(folder.createFile(blob_(p.file, true)));
-      made.push(f);
-      row.file = fileUrl_(f);
-      if (!row.title) row.title = p.kind === 'intro' ? '소개' : cleanTitle_(p.file.name);
+      const got = p.link ? copyFromLink_(p.link, folder) : { f: folder.createFile(blob_(p.file, true)), name: p.file.name };
+      made.push(got.f);
+      publish_(got.f);
+      row.file = fileUrl_(got.f);
+      if (!row.title) row.title = p.kind === 'intro' ? '소개' : cleanTitle_(got.name);
     } else if (p.kind === 'video') {
       if (!ytId_(p.url)) throw new Error('유튜브 주소를 알아볼 수 없어요.');
       row.youtube = String(p.url).trim();
@@ -495,9 +531,11 @@ function update_(p) {
   const trash = [];
   try {
     // 파일 교체 (PDF·카드뉴스)
-    if (p.file && (kind === 'pdf' || kind === 'intro' || kind === 'stageintro')) {
-      const f = publish_(folderFor_(v.stage, v.item, group).createFile(blob_(p.file, true)));
+    if ((p.file || p.link) && (kind === 'pdf' || kind === 'intro' || kind === 'stageintro')) {
+      const folder = folderFor_(v.stage, v.item, group);
+      const f = p.link ? copyFromLink_(p.link, folder).f : folder.createFile(blob_(p.file, true));
       made.push(f);
+      publish_(f);
       data.file = fileUrl_(f);
       const old = openFile_(driveId_(cur.file));
       if (old && inRoot_(old)) trash.push(old);
