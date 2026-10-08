@@ -22,7 +22,9 @@
   .tab { padding: 10px 16px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted); font-weight: 700; cursor: pointer; }
   .tab[aria-selected="true"] { color: var(--green); border-bottom-color: var(--green); }
 
-  main { max-width: 960px; margin: 0 auto; padding: 20px 16px 80px; }
+  main { max-width: 1160px; margin: 0 auto; padding: 20px 16px 80px; }
+  #up, #login { max-width: 760px; margin-inline: auto; }
+  .bar { max-width: 1160px; }
   .panel { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
   .note { margin: 0 0 16px; padding: 12px 14px; border-radius: 12px; background: var(--green-soft); color: var(--green-dark); font-size: 14px; }
 
@@ -63,9 +65,37 @@
   .chip { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
   .chip[aria-pressed="true"] { border-color: var(--green); background: var(--green); color: #fff; }
   .deploy { margin-left: auto; color: var(--muted); font-size: 13px; }
-  .stage { margin: 22px 0 8px; color: var(--navy); font-size: 18px; }
-  .item { margin-bottom: 10px; background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-  .item__head { padding: 10px 14px; background: #fbfcf9; border-bottom: 1px solid var(--line); font-weight: 700; }
+  /* 목록: 왼쪽 목차(따라다님) + 오른쪽 자료 */
+  .listgrid { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 20px; align-items: start; }
+  .toc { position: sticky; top: 112px; max-height: calc(100vh - 130px); overflow: auto; padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
+  .toc__stage { margin: 10px 6px 4px; color: var(--navy); font-size: 13px; font-weight: 800; }
+  .toc__stage:first-child { margin-top: 2px; }
+  .toc__item { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; color: var(--ink); text-decoration: none; font-size: 14px; line-height: 1.35; }
+  .toc__item:hover { background: var(--paper); }
+  .toc__item.is-here { background: var(--green-soft); font-weight: 700; }
+  .toc__item:focus-visible { outline: 2px solid var(--green); }
+  .toc__n { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); }
+  .dot.is-bad { background: var(--bad); }
+  .dot.is-warn { background: #d99a00; }
+  .dot.is-wait { background: var(--wait); }
+  .dot.is-check { background: var(--line); }
+  .dot.is-empty { background: none; box-shadow: inset 0 0 0 2px #b8c2b0; }
+  .toc-sel { display: none; }
+  .stage { margin: 22px 0 8px; color: var(--navy); font-size: 18px; scroll-margin-top: 120px; }
+  .stage:first-child { margin-top: 0; }
+  .item { margin-bottom: 10px; background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; scroll-margin-top: 120px; transition: box-shadow .4s; }
+  .item.is-flash { box-shadow: 0 0 0 3px var(--green); }
+  .item__head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 10px 14px; background: #fbfcf9; border-bottom: 1px solid var(--line); font-weight: 700; }
+  .item__tally { display: flex; gap: 10px; color: var(--muted); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  @media (max-width: 860px) {
+    .listgrid { grid-template-columns: 1fr; }
+    .toc { position: sticky; top: 100px; z-index: 4; max-height: none; overflow: visible; padding: 8px; }
+    .toc__list { display: none; }
+    .toc-sel { display: block; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-weight: 600; }
+    .stage, .item { scroll-margin-top: 170px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .item { transition: none; } }
   .item__empty { padding: 10px 14px; color: var(--muted); font-size: 14px; }
   .mat { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: start; padding: 10px 14px; border-top: 1px solid #eef1ea; }
   .mat:first-of-type { border-top: 0; }
@@ -179,7 +209,10 @@
   <!-- 목록 -->
   <section id="list" hidden>
     <div class="summary" id="summary"></div>
-    <div id="tree"></div>
+    <div class="listgrid">
+      <nav class="toc" id="toc" aria-label="목차"></nav>
+      <div id="tree"></div>
+    </div>
   </section>
 </main>
 
@@ -571,25 +604,88 @@
     $('fBad').onclick = () => { onlyBad = !onlyBad; drawList(); };
     $('fReload').onclick = () => loadList({ force: true });
 
-    const html = lists.map((s) => {
+    /* 단계 → 항목 묶음 (목차와 본문이 같은 순서·같은 id) */
+    let n = 0;
+    const groups = lists.map((s, si) => {
       const intro = rows.filter((r) => r.kind === 'stageintro' && stageOfRow(r) === s);
       const items = [{ name: `${STAGE_INTRO} 카드뉴스`, rows: intro, intro: true }]
-        .concat(s.items.map((it) => ({ name: it, rows: rows.filter((r) => r.kind !== 'stageintro' && r.item === it) })));
-      return `<h2 class="stage">${esc(s.name)}</h2>` + items.map((it) => {
-        if (it.intro && !it.rows.length) return '';
-        const clean = it.rows.length && it.rows.every((r) => stateOf(r).cls === 'is-ok');
-        return `
-          <div class="item${clean ? ' is-clean' : ''}">
-            <div class="item__head">${esc(it.name)}</div>
-            ${it.rows.length ? it.rows.map(matHtml).join('') : `<div class="item__empty">${ICON.none} 자료 없음</div>`}
-          </div>`;
-      }).join('');
-    }).join('');
+        .concat(s.items.map((it) => ({ name: it, rows: rows.filter((r) => r.kind !== 'stageintro' && r.item === it) })))
+        .filter((it) => !(it.intro && !it.rows.length));
+      items.forEach((it) => { it.id = `it-${n++}`; it.worst = worstOf(it.rows); });
+      return { name: s.name, id: `st-${si}`, items };
+    });
     const lost = rows.filter((r) => !stageOfRow(r));
-    $('tree').innerHTML = html + (lost.length ? `<h2 class="stage">항목을 알 수 없는 자료</h2><div class="item">${lost.map(matHtml).join('')}</div>` : '');
+    if (lost.length) groups.push({ name: '항목을 알 수 없는 자료', id: 'st-lost', items: [{ name: '로드맵에 없는 항목', rows: lost, id: 'it-lost', worst: worstOf(lost) }] });
+
+    const tally = (list) => {
+      const c = { bad: 0, warn: 0, wait: 0 };
+      list.forEach((r) => { const k = stateOf(r).cls.slice(3); if (k in c) c[k]++; });
+      return [c.bad && `${ICON.bad} ${c.bad}`, c.warn && `${ICON.warn} ${c.warn}`, c.wait && `${ICON.wait} ${c.wait}`].filter(Boolean).join(' ');
+    };
+    const showInToc = (it) => !onlyBad || ['is-bad', 'is-warn', 'is-wait', 'is-empty'].indexOf(it.worst) >= 0;
+
+    $('tree').innerHTML = groups.map((g) => `<h2 class="stage" id="${g.id}">${esc(g.name)}</h2>` + g.items.map((it) => `
+      <div class="item${it.worst === 'is-ok' ? ' is-clean' : ''}" id="${it.id}">
+        <div class="item__head"><span>${esc(it.name)}</span><span class="item__tally">${tally(it.rows)}<span>${it.rows.length ? `${it.rows.length}개` : ''}</span></span></div>
+        ${it.rows.length ? it.rows.map(matHtml).join('') : `<div class="item__empty">${ICON.none} 자료 없음</div>`}
+      </div>`).join('')).join('');
     $('tree').classList.toggle('hide-ok', onlyBad);
+
+    $('toc').innerHTML = `
+      <select class="toc-sel" id="tocSel" aria-label="항목으로 이동">
+        <option value="">항목으로 이동…</option>
+        ${groups.map((g) => `<optgroup label="${esc(g.name)}">${g.items.filter(showInToc).map((it) => `<option value="${it.id}">${esc(it.name)} (${it.rows.length})${it.worst === 'is-bad' ? ' ' + ICON.bad : ''}</option>`).join('')}</optgroup>`).join('')}
+      </select>
+      <div class="toc__list">
+        ${groups.map((g) => {
+          const its = g.items.filter(showInToc);
+          if (!its.length) return '';
+          return `<div class="toc__stage">${esc(g.name)}</div>` + its.map((it) => `
+            <a class="toc__item" href="#${it.id}" data-go="${it.id}"><span class="dot ${it.worst}"></span><span>${esc(it.name)}</span><span class="toc__n">${it.rows.length || ''}</span></a>`).join('');
+        }).join('')}
+      </div>`;
+    $('toc').querySelectorAll('[data-go]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); goTo(a.dataset.go); }));
+    $('tocSel').addEventListener('change', () => { if ($('tocSel').value) goTo($('tocSel').value); $('tocSel').value = ''; });
     bindRows();
+    watchToc();
   }
+
+  /* 항목 안에서 가장 급한 상태 (목차 점 색) */
+  function worstOf(list) {
+    if (!list.length) return 'is-empty';
+    const order = ['is-bad', 'is-warn', 'is-wait', 'is-check', 'is-ok'];
+    return order.find((c) => list.some((r) => stateOf(r).cls === c)) || 'is-ok';
+  }
+
+  let goingTo = 0;
+  function goTo(id) {
+    const el = $(id);
+    if (!el) return;
+    markHere(id);
+    clearTimeout(goingTo);
+    goingTo = setTimeout(() => { goingTo = 0; }, 900);
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    el.classList.add('is-flash');
+    setTimeout(() => el.classList.remove('is-flash'), 1200);
+  }
+
+  /* 지금 화면 맨 위에 있는 항목을 목차에 표시 (목차를 눌렀을 땐 그 항목) */
+  let hereRaf = 0;
+  function markHere(id) {
+    $('toc').querySelectorAll('.toc__item').forEach((a) => a.classList.toggle('is-here', a.dataset.go === id));
+  }
+  function watchToc() {
+    const line = matchMedia('(max-width: 860px)').matches ? 180 : 130;
+    let cur = '';
+    $('tree').querySelectorAll('.item').forEach((el) => { if (el.getBoundingClientRect().top <= line) cur = el.id; });
+    markHere(cur);
+  }
+  window.addEventListener('scroll', () => {
+    if ($('list').hidden || goingTo) return;
+    cancelAnimationFrame(hereRaf);
+    hereRaf = requestAnimationFrame(watchToc);
+  }, { passive: true });
 
   function bindRows() {
     $('tree').querySelectorAll('.mat').forEach((el) => {
