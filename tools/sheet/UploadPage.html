@@ -466,19 +466,46 @@
 
   let onlyBad = false;
 
-  async function loadList() {
-    $('tree').innerHTML = '<div class="center"><div class="spin"></div><div>목록 불러오는 중…</div></div>';
-    $('summary').innerHTML = '';
+  /* 목록은 지난번 것을 바로 보여 주고(기기에 저장), 뒤에서 조용히 새로 받아 바꿈.
+     점검은 서버에 저장된 결과(30분마다 자동 점검)를 쓰고, 30분이 지난 줄만 다시 점검 */
+  const FRESH = 30 * 60 * 1000;
+  let busy = false;
+
+  function useList(d) {
+    data = d;
+    lists = d.stages;
+    status = {};
+    d.rows.forEach((r) => { if (r.st) status[r.uid] = r.st; });
+    drawList();
+  }
+
+  async function loadList(opt) {
+    opt = opt || {};
+    if (busy) return;
+    busy = true;
+    if (!opt.quiet) {
+      let cached = null;
+      try { cached = JSON.parse(store.get('listCache') || 'null'); } catch (e) { cached = null; }
+      if (cached && cached.rows) useList(cached);
+      else $('tree').innerHTML = '<div class="center"><div class="spin"></div><div>목록 불러오는 중…</div></div>';
+    }
     try {
-      data = await call('list');
-      lists = data.stages;
-      status = {};
-      drawList();
-      checkAll();
+      const d = await call('list');
+      store.set('listCache', JSON.stringify(d));
+      useList(d);
+      await checkAll(opt.force);
     } catch (e) {
-      $('tree').innerHTML = `<p class="err">${esc(e.message)}</p>`;
+      if (!opt.quiet && !data) $('tree').innerHTML = `<p class="err">${esc(e.message)}</p>`;
+      else toast(e.message);
+    } finally {
+      busy = false;
     }
   }
+
+  /* 목록 화면을 보고 있으면 1분마다 조용히 새로 고침 */
+  setInterval(() => {
+    if (!$('list').hidden && document.visibilityState === 'visible') loadList({ quiet: true });
+  }, 60 * 1000);
 
   function stageOfRow(r) {
     if (r.kind === 'stageintro') return lists.find((s) => s.name.replace(/^\d+\s*/, '') === r.stage.replace(/^\d+\s*/, '')) || null;
@@ -516,6 +543,14 @@
       </div>`;
   }
 
+  /* 가장 오래된 점검이 몇 분 전인지 */
+  function checkedText() {
+    const ts = Object.values(status).map((x) => x.t).filter(Boolean);
+    if (!ts.length) return '';
+    const m = Math.round((Date.now() - Math.min.apply(null, ts)) / 60000);
+    return m < 1 ? '방금 점검' : `${m}분 전 점검`;
+  }
+
   function drawList() {
     const rows = data.rows;
     const cnt = { ok: 0, bad: 0, warn: 0, wait: 0, check: 0 };
@@ -531,10 +566,10 @@
     $('summary').innerHTML = `
       <button class="chip" id="fBad" aria-pressed="${onlyBad}">고칠 것만 보기</button>
       <span>전체 ${rows.length} · ${ICON.ok} ${cnt.ok} · ${ICON.bad} ${cnt.bad} · ${ICON.warn} ${cnt.warn} · ${ICON.wait} ${cnt.wait}${cnt.check ? ` · 점검 중 ${cnt.check}` : ''} · 자료 없는 항목 ${empty}</span>
-      <button class="chip" id="fReload">새로 고침</button>
-      <span class="deploy">${esc(depText)}</span>`;
+      <button class="chip" id="fReload">지금 다시 점검</button>
+      <span class="deploy">${esc([checkedText(), depText].filter(Boolean).join(' · '))}</span>`;
     $('fBad').onclick = () => { onlyBad = !onlyBad; drawList(); };
-    $('fReload').onclick = loadList;
+    $('fReload').onclick = () => loadList({ force: true });
 
     const html = lists.map((s) => {
       const intro = rows.filter((r) => r.kind === 'stageintro' && stageOfRow(r) === s);
@@ -574,8 +609,12 @@
     });
   }
 
-  async function checkAll() {
-    const uids = data.rows.map((r) => r.uid);
+  async function checkAll(force) {
+    const now = Date.now();
+    const uids = data.rows.filter((r) => force || !status[r.uid] || !status[r.uid].t || now - status[r.uid].t > FRESH).map((r) => r.uid);
+    if (force) uids.forEach((u) => { delete status[u]; });
+    if (!uids.length) return;
+    if (force) drawList();
     const chunks = [];
     for (let i = 0; i < uids.length; i += 8) chunks.push(uids.slice(i, i + 8));
     const mine = data;
@@ -589,6 +628,10 @@
       }
     };
     await Promise.all([worker(), worker(), worker()]);
+    if (data === mine) {
+      data.rows.forEach((r) => { r.st = status[r.uid] || r.st; });
+      store.set('listCache', JSON.stringify(data));
+    }
   }
 
   async function remove(r) {

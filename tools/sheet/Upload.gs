@@ -369,20 +369,23 @@ function init_() {
   return { stages: stages_(), stageIntro: STAGE_INTRO };
 }
 
+// 목록 + 저장해 둔 점검 결과(st)를 같이 → 앱이 열리자마자 상태가 보임
 function list_() {
   const t = table_();
   const rows = rows_(t);
+  const saved = getStatus_(rows.map((r) => r.uid));
+  ensureStatusTrigger_();
   return {
     stages: stages_(),
     rows: rows.map((r) => ({
       uid: r.uid, row: r.row, stage: r.stage, item: r.item, group: r.group, title: r.title, desc: r.desc,
-      by: r.by, at: r.at, kind: kindOf_(r), link: r.youtube || r.file, thumb: r.thumb,
+      by: r.by, at: r.at, kind: kindOf_(r), link: r.youtube || r.file, thumb: r.thumb, st: saved[r.uid] || null,
     })),
     deploy: deployState_(),
   };
 }
 
-// 줄마다 점검 → {uid: {s: 'ok'|'bad'|'warn', why, fix}}
+// 줄마다 점검 → {uid: {s: 'ok'|'bad'|'warn', why, fix, t}} (결과는 저장해 둠)
 function check_(uids) {
   const t = table_();
   const all = rows_(t);
@@ -390,9 +393,42 @@ function check_(uids) {
   const out = {};
   uids.forEach((uid) => {
     const r = all.find((x) => x.uid === uid);
-    if (r) out[uid] = checkRow_(r, st);
+    if (r) out[uid] = Object.assign(checkRow_(r, st), { t: Date.now() });
   });
+  putStatus_(out);
   return out;
+}
+
+// ---- 점검 결과 보관 (스크립트 캐시, 6시간) + 30분마다 전체 점검 ----
+function getStatus_(uids) {
+  const got = CacheService.getScriptCache().getAll(uids.map((u) => 'st_' + u));
+  const out = {};
+  uids.forEach((u) => { const v = got['st_' + u]; if (v) { try { out[u] = JSON.parse(v); } catch (e) { /* 무시 */ } } });
+  return out;
+}
+
+function putStatus_(map) {
+  const vals = {};
+  for (const u in map) vals['st_' + u] = JSON.stringify(map[u]);
+  if (Object.keys(vals).length) CacheService.getScriptCache().putAll(vals, 21600);
+}
+
+function ensureStatusTrigger_() {
+  if (ScriptApp.getProjectTriggers().some((t) => t.getHandlerFunction() === 'refreshStatus')) return;
+  ScriptApp.newTrigger('refreshStatus').timeBased().everyMinutes(30).create();
+}
+
+// 30분마다 (앱을 안 열어도) 모든 줄 점검해 두기 — 실행 시간 제한 안쪽으로 4분까지
+function refreshStatus() {
+  const start = Date.now();
+  const t = table_();
+  const st = stages_();
+  const out = {};
+  for (const r of rows_(t)) {
+    if (Date.now() - start > 4 * 60 * 1000) break;
+    try { out[r.uid] = Object.assign(checkRow_(r, st), { t: Date.now() }); } catch (e) { /* 다음 번에 */ }
+  }
+  putStatus_(out);
 }
 
 function checkRow_(r, stages) {
@@ -506,6 +542,8 @@ function upload_(p) {
     row.uid = newId_();
     row.at = new Date();
     withLock_(() => writeRow_(table_(), 0, row));
+    // 올리면서 공유·형식을 다 확인했으므로 바로 '정상'
+    putStatus_({ [row.uid]: { s: 'ok', t: Date.now() } });
   } catch (e) {
     made.forEach((f) => { try { f.setTrashed(true); } catch (_) { /* 이미 없음 */ } });
     throw e;
@@ -578,6 +616,7 @@ function update_(p) {
     throw e;
   }
   trash.forEach((f) => { try { f.setTrashed(true); } catch (_) { /* 이미 없음 */ } });
+  check_([p.uid]);
   scheduleDeploy_();
   return { ok: true };
 }
@@ -621,7 +660,7 @@ function fix_(p) {
     withLock_(() => writeRow_(t, findRow_(t, p.uid), { at: new Date() }));
   }
   scheduleDeploy_();
-  return checkRow_(rows_(t).find((r) => r.uid === p.uid), stages_());
+  return check_([p.uid])[p.uid];
 }
 
 // =========================================================
