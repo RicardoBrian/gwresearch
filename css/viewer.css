@@ -868,6 +868,46 @@ html.has-modal { overflow: hidden; }
   background: #fff;
 }
 
+.tcard__thumb.is-pdf img { object-position: top center; } /* 문서는 첫 쪽 윗부분 */
+.tcard__thumb.is-video img { background: #000; }
+
+.tcard__badge {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .92);
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .12);
+}
+
+/* 재생 표시는 영상 그림이 있을 때만 (그림이 안 열려 빠지면 같이 숨김) */
+.tcard__play { display: none; }
+.tcard__thumb img + .tcard__play {
+  display: block;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .55);
+  transform: translate(-50%, -50%);
+}
+
+.tcard__thumb img + .tcard__play::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: 14px;
+  border-style: solid;
+  border-width: 9px 0 9px 14px;
+  border-color: transparent transparent transparent #fff;
+}
+
 .tcard__ph {
   position: absolute;
   inset: 0;

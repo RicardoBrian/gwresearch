@@ -379,10 +379,10 @@
       ? `${stageLink}<span class="viewer__sep" aria-hidden="true">›</span><a class="viewer__crumbitem" href="#${esc(item.id)}" data-replace>${esc(item.title)}</a>`
       : stageLink;
 
-    // 웹앱만 2개 이상이면 썸네일 카드부터 (고르면 #…/번호 로 들어가 지금처럼 창 안에서 엶)
+    // 자료가 2개 이상이면 썸네일 카드부터 (고르면 #…/번호 로 들어가 지금처럼 창 안에서 엶)
     const title = current ? current.name : item.title;
-    const webs = list.filter((m) => m.type !== 'intro');
-    if (!loadFailed && webs.length > 1 && webs.every((m) => m.type === 'web')) {
+    const mats = list.filter((m) => m.type !== 'intro');
+    if (!loadFailed && mats.length > 1) {
       if (!pick || !list[pick - 1]) {
         renderGallery({ item, stage, title, crumb, list, base, intro: list[0].type === 'intro' ? list[0].file : '' });
         return;
@@ -481,19 +481,42 @@
   }
 
   // ---- 웹앱 썸네일 카드 (대표 이미지가 없거나 안 열리면 아이콘과 사이트 주소) ----
+  // 썸네일 그림 주소: 웹은 대표 이미지(썸네일 칸), PDF·드라이브 영상은 드라이브 미리보기(첫 쪽·첫 장면), 유튜브는 영상 대표 그림
+  function thumbOf(m) {
+    if (m.image) return m.image;
+    if (m.type === 'pdf') {
+      const id = String(m.file || '').match(/^pdf\/([\w-]+)/);
+      return id ? `https://drive.google.com/thumbnail?id=${id[1]}&sz=w800` : '';
+    }
+    if (m.type === 'video') {
+      if (m.drive) return `https://drive.google.com/thumbnail?id=${m.drive}&sz=w800`;
+      const y = youtubeId(m.youtube);
+      return y ? `https://i.ytimg.com/vi/${y}/hqdefault.jpg` : '';
+    }
+    return '';
+  }
+
   function renderGallery({ item, stage, title, crumb, list, base, intro }) {
     const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
-    const cards = list.map((m, k) => m.type !== 'web' ? '' : `
+    const LABEL = { pdf: 'PDF', video: '영상', web: '웹' };
+    const cards = list.map((m, k) => {
+      if (m.type === 'intro') return '';
+      const src = thumbOf(m);
+      const ph = m.type === 'web' ? host(m.url) : m.type === 'video' ? '영상' : 'PDF 문서';
+      return `
       <li><a class="tcard" href="#${esc(base)}/${k + 1}">
-        <span class="tcard__thumb">
-          <span class="tcard__ph">${ICON.web}<span>${esc(host(m.url))}</span></span>
-          ${m.image ? `<img src="${esc(m.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}
+        <span class="tcard__thumb is-${esc(m.type)}">
+          <span class="tcard__ph">${ICON[m.type] || ICON.pdf}<span>${esc(ph)}</span></span>
+          ${src ? `<img src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}
+          ${m.type === 'video' ? '<span class="tcard__play" aria-hidden="true"></span>' : ''}
+          <span class="tcard__badge">${LABEL[m.type] || ''}</span>
         </span>
         <span class="tcard__body">
           <span class="tcard__title">${esc(m.title)}</span>
-          ${m.desc ? `<span class="tcard__desc">${esc(m.desc)}</span>` : ''}
+          ${m.desc || m.sub ? `<span class="tcard__desc">${esc([m.sub, m.desc].filter(Boolean).join(' · '))}</span>` : ''}
         </span>
-      </a></li>`).join('');
+      </a></li>`;
+    }).join('');
     mount(`
       ${head({ stage, title, crumb })}
       <div class="viewer__body viewer__body--stage${intro ? ' has-intro' : ''}">
