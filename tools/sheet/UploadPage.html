@@ -119,7 +119,24 @@
   .mat__why.is-warn { background: var(--warn-soft); color: var(--warn); }
   .mat__why.is-wait { background: var(--wait-soft); color: var(--wait); }
   .mat__btns { display: flex; gap: 6px; }
-  .hide-ok .mat.is-ok, .hide-ok .item.is-clean { display: none; }
+  .hide-ok .mat.is-ok, .hide-ok .item.is-clean, .hide-ok .grp.is-clean { display: none; }
+  /* 항목 안 분류 묶음 (접고 펼치기) */
+  .grp { border-top: 1px solid #eef1ea; }
+  .grp:first-of-type { border-top: 0; }
+  .grp > summary { display: flex; align-items: center; gap: 8px; padding: 9px 14px; background: #fafbf8; cursor: pointer; font-weight: 700; font-size: 14px; list-style: none; }
+  .grp > summary::-webkit-details-marker { display: none; }
+  .grp > summary::before { content: ""; width: 0; height: 0; border-style: solid; border-width: 5px 0 5px 7px; border-color: transparent transparent transparent var(--muted); transition: transform .15s; }
+  .grp[open] > summary::before { transform: rotate(90deg); }
+  .grp__n { color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .grp__tally { margin-left: auto; color: var(--muted); font-size: 13px; }
+  .mat__btns { flex-wrap: wrap; justify-content: flex-end; }
+  .mat__btns a.btn { text-decoration: none; color: var(--ink); }
+  .btn--icon { width: 30px; padding: 5px 0; }
+  .tag { display: inline-block; margin-left: 6px; padding: 1px 8px; border: 1px dashed #c4ccbb; border-radius: 999px; color: var(--muted); font-size: 12px; font-weight: 600; }
+  .search { flex: 1 1 220px; min-width: 0; padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; }
+  .mat.is-off, .grp.is-off, .item.is-off { display: none; }
+  .paste { display: flex; align-items: center; gap: 10px; margin-top: 6px; color: var(--muted); font-size: 13px; }
+  .paste img { width: 120px; aspect-ratio: 1.91 / 1; object-fit: cover; border: 1px solid var(--line); border-radius: 8px; }
 
   dialog { width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 0; border-radius: 18px; }
   dialog::backdrop { background: rgba(20, 30, 10, .45); }
@@ -216,7 +233,8 @@
         <input type="text" inputmode="url" id="url" autocomplete="off" placeholder="https://"></label>
 
       <div class="field" data-for="web"><span>썸네일 그림 <small>(선택 · 웹앱 화면 캡처 · 가로로 긴 그림)</small></span>
-        <input type="file" id="thumb" accept="image/*"></div>
+        <input type="file" id="thumb" accept="image/*">
+        <div class="paste" id="thumbPaste"><span>또는 화면 캡처(Win+Shift+S) 뒤 이 화면에서 <b>Ctrl+V</b></span></div></div>
 
       <label class="field"><span>올린 사람</span><input type="text" id="by" autocomplete="name" placeholder="이름"></label>
 
@@ -255,6 +273,7 @@
         <label class="hint">또는 내 컴퓨터에서 PDF 고르기 <input type="file" id="eFile" accept="application/pdf,.pdf"></label></div>
       <div class="field" id="eThumbF"><span>썸네일 그림 <small id="eThumbNow"></small></span>
         <input type="file" id="eThumb" accept="image/*">
+        <div class="paste" id="eThumbPaste"><span>또는 화면 캡처 뒤 <b>Ctrl+V</b></span></div>
         <label><input type="checkbox" id="eThumbDrop"> 썸네일 지우기</label></div>
       <p class="err" id="editErr" hidden></p>
       <div class="actions">
@@ -277,6 +296,16 @@
     set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 저장 못 해도 동작 */ } },
   };
   const MAX = 45 * 1024 * 1024;
+  /* [사이트에서 보기]: 항목 이름 → 사이트 주소 (#항목id) */
+  const SITE = 'https:\/\/gwansan.com/';
+  const ITEM_IDS = { 'KLS 기초 한국어 선이수제': 'kls-prerequisite', '선이수제 학생 추수지도': 'prerequisite-followup', '생활적응교육': 'life-adaptation', '언어권별 기초학력 진단': 'language-diagnosis', '학생별 지원 필요 영역 확인 및 관리': 'needs-management', '특별학급 운영': 'special-class', '개별수업 운영': 'individual-class', '이중언어 교육': 'bilingual-education', '교과 이해 지원': 'subject-support', '기초학력 향상 지원': 'basic-skills', '상호문화교육': 'intercultural-education', '어울림 집단 상담': 'group-counseling', '예체능교육': 'arts-sports', '또래멘토링': 'peer-mentoring', '세계 각국 학생 대사': 'student-ambassadors', '이중언어 말하기 대회': 'bilingual-speech', '유네스코 세계시민교육': 'unesco-gced', '글로컬 문제해결 프로젝트': 'glocal-project' };
+  function siteUrl(r) {
+    if (r.kind === 'stageintro') { const n = String(r.stage).match(/^\s*(\d)/); return n ? `${SITE}#stage-${n[1]}` : SITE; }
+    const id = ITEM_IDS[String(r.item).trim()];
+    if (!id) return SITE;
+    const g = (r.group || '').trim();
+    return `${SITE}#${id}${g && g !== '소개' ? '/' + encodeURIComponent(g) : ''}`;
+  }
   const KIND = { pdf: 'PDF', folder: '폴더', intro: '카드뉴스', stageintro: '단계 소개', video: '영상', web: '웹', gdoc: '구글 문서', none: '링크 없음', bad: '링크 오류' };
   let code = store.get('uploadCode');
   let lists = null;
@@ -532,6 +561,7 @@
   function resetText() {
     ['title', 'desc', 'url'].forEach((id) => { $(id).value = ''; });
     $('thumb').value = '';
+    $('thumbPaste').innerHTML = '<span>또는 화면 캡처(Win+Shift+S) 뒤 이 화면에서 <b>Ctrl+V</b></span>';
     setTimeout(() => drawFiles(), 2500);
   }
 
@@ -645,18 +675,22 @@
 
   const FIX = { share: '공유 열기', 'share-thumb': '썸네일 공유 열기', restore: '휴지통에서 꺼내기', unhide: '주소로 바꾸기' };
 
-  function matHtml(r) {
+  function matHtml(r, k, n) {
     const st = stateOf(r);
-    const meta = [KIND[r.kind] || '', r.group && r.group !== '소개' ? r.group : '', r.by ? `올린 사람 ${r.by}` : ''].filter(Boolean).join(' · ');
+    const meta = [KIND[r.kind] || '', r.sub || '', r.by ? `올린 사람 ${r.by}` : ''].filter(Boolean).join(' · ');
+    const noThumb = (r.kind === 'web' || r.kind === 'gdoc') && !r.thumb;
+    const canMove = n > 1 && r.kind !== 'stageintro' && r.kind !== 'intro';
     return `
-      <div class="mat ${st.cls === 'is-ok' ? 'is-ok' : ''}" data-uid="${esc(r.uid)}">
+      <div class="mat ${st.cls === 'is-ok' ? 'is-ok' : ''}" data-uid="${esc(r.uid)}" data-q="${esc([r.title, r.group, r.sub, r.by, r.item].join(' ').toLowerCase())}">
         <div class="mat__state" title="${esc(st.why || '정상')}">${st.icon}</div>
         <div>
-          <div class="mat__title">${esc(r.title || (r.kind === 'intro' || r.kind === 'stageintro' ? '소개 카드뉴스' : '(제목 없음)'))}</div>
+          <div class="mat__title">${esc(r.title || (r.kind === 'intro' || r.kind === 'stageintro' ? '소개 카드뉴스' : '(제목 없음)'))}${noThumb ? '<span class="tag">썸네일 없음</span>' : ''}</div>
           <div class="mat__meta">${esc(meta)} · 시트 ${r.row}행</div>
           ${st.why ? `<div class="mat__why ${st.cls}">${esc(st.why)}${st.fix ? ` <button class="btn btn--sm" data-fix="${esc(st.fix)}">${esc(FIX[st.fix] || '고치기')}</button>` : ''}</div>` : ''}
         </div>
         <div class="mat__btns">
+          ${canMove ? `<button class="btn btn--sm btn--icon" data-move="-1" title="위로" aria-label="위로"${k === 0 ? ' disabled' : ''}>▲</button><button class="btn btn--sm btn--icon" data-move="1" title="아래로" aria-label="아래로"${k === n - 1 ? ' disabled' : ''}>▼</button>` : ''}
+          <a class="btn btn--sm" href="${esc(siteUrl(r))}" target="_blank" rel="noopener">사이트에서 보기</a>
           <button class="btn btn--sm" data-edit>고치기</button>
           <button class="btn btn--sm btn--danger" data-del>삭제</button>
         </div>
@@ -682,11 +716,13 @@
     const empty = lists.reduce((n, s) => n + s.items.filter((it) => !rows.some((r) => r.item === it)).length, 0);
     const depText = dep.lastDeploy ? `마지막 사이트 반영 ${new Date(dep.lastDeploy).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '';
     $('summary').innerHTML = `
+      <input class="search" id="fQ" type="search" placeholder="제목·분류·과목·올린 사람 검색" value="${esc(query)}">
       <button class="chip" id="fBad" aria-pressed="${onlyBad}">고칠 것만 보기</button>
       <span>전체 ${rows.length} · ${ICON.ok} ${cnt.ok} · ${ICON.bad} ${cnt.bad} · ${ICON.warn} ${cnt.warn} · ${ICON.wait} ${cnt.wait}${cnt.check ? ` · 점검 중 ${cnt.check}` : ''} · 자료 없는 항목 ${empty}</span>
       <button class="chip" id="fReload">지금 다시 점검</button>
       <span class="deploy">${esc([checkedText(), depText].filter(Boolean).join(' · '))}</span>`;
     $('fBad').onclick = () => { onlyBad = !onlyBad; drawList(); };
+    $('fQ').oninput = () => { query = $('fQ').value; applySearch(); };
     $('fReload').onclick = () => loadList({ force: true });
 
     /* 단계 → 항목 묶음 (목차와 본문이 같은 순서·같은 id) */
@@ -709,12 +745,35 @@
     };
     const showInToc = (it) => !onlyBad || ['is-bad', 'is-warn', 'is-wait', 'is-empty'].indexOf(it.worst) >= 0;
 
+    /* 항목 안을 분류별로 (분류가 하나뿐이면 묶지 않음). 접힘 상태는 기억 */
+    const body = (it) => {
+      if (!it.rows.length) return `<div class="item__empty">${ICON.none} 자료 없음</div>`;
+      const byGroup = [];
+      it.rows.forEach((r) => {
+        const name = r.kind === 'intro' ? '소개 카드뉴스' : (r.group || '').trim() || '분류 없음';
+        let g = byGroup.find((x) => x.name === name);
+        if (!g) byGroup.push(g = { name, rows: [] });
+        g.rows.push(r);
+      });
+      const mats = (g) => g.rows.map((r, k) => matHtml(r, k, g.rows.length)).join('');
+      if (byGroup.length === 1) return mats(byGroup[0]);
+      return byGroup.map((g) => {
+        const key = `${it.name}|${g.name}`;
+        const open = folded.has(key) ? folded.get(key) : g.rows.length <= 6;
+        const clean = worstOf(g.rows) === 'is-ok';
+        return `<details class="grp${clean ? ' is-clean' : ''}" data-key="${esc(key)}"${open ? ' open' : ''}>
+          <summary>${esc(g.name)} <span class="grp__n">${g.rows.length}</span><span class="grp__tally">${tally(g.rows)}</span></summary>
+          ${mats(g)}</details>`;
+      }).join('');
+    };
     $('tree').innerHTML = groups.map((g) => `<h2 class="stage" id="${g.id}">${esc(g.name)}</h2>` + g.items.map((it) => `
       <div class="item${it.worst === 'is-ok' ? ' is-clean' : ''}" id="${it.id}">
         <div class="item__head"><span>${esc(it.name)}</span><span class="item__tally">${tally(it.rows)}<span>${it.rows.length ? `${it.rows.length}개` : ''}</span></span></div>
-        ${it.rows.length ? it.rows.map(matHtml).join('') : `<div class="item__empty">${ICON.none} 자료 없음</div>`}
+        ${body(it)}
       </div>`).join('')).join('');
     $('tree').classList.toggle('hide-ok', onlyBad);
+    $('tree').querySelectorAll('.grp').forEach((d) => d.addEventListener('toggle', () => folded.set(d.dataset.key, d.open)));
+    applySearch();
 
     $('toc').innerHTML = `
       <select class="toc-sel" id="tocSel" aria-label="항목으로 이동">
@@ -733,6 +792,25 @@
     $('tocSel').addEventListener('change', () => { if ($('tocSel').value) goTo($('tocSel').value); $('tocSel').value = ''; });
     bindRows();
     watchToc();
+  }
+
+  /* 검색: 맞는 자료만, 맞는 게 없는 묶음·항목은 숨김 (찾는 중엔 묶음을 펼침) */
+  let query = '';
+  const folded = new Map();
+  function applySearch() {
+    const q = query.trim().toLowerCase();
+    $('tree').querySelectorAll('.mat').forEach((el) => el.classList.toggle('is-off', Boolean(q) && el.dataset.q.indexOf(q) < 0));
+    $('tree').querySelectorAll('.grp').forEach((d) => {
+      const any = d.querySelector('.mat:not(.is-off)');
+      d.classList.toggle('is-off', Boolean(q) && !any);
+      if (q && any) d.open = true;
+    });
+    $('tree').querySelectorAll('.item').forEach((d) => d.classList.toggle('is-off', Boolean(q) && !d.querySelector('.mat:not(.is-off)')));
+    $('tree').querySelectorAll('.stage').forEach((h) => {
+      let el = h.nextElementSibling; let any = false;
+      while (el && !el.classList.contains('stage')) { if (!el.classList.contains('is-off')) any = true; el = el.nextElementSibling; }
+      h.hidden = Boolean(q) && !any;
+    });
   }
 
   /* 항목 안에서 가장 급한 상태 (목차 점 색) */
@@ -778,6 +856,7 @@
       const r = data.rows.find((x) => x.uid === el.dataset.uid);
       el.querySelector('[data-edit]').onclick = () => openEdit(r);
       el.querySelector('[data-del]').onclick = () => remove(r);
+      el.querySelectorAll('[data-move]').forEach((b) => { b.onclick = () => move(r, Number(b.dataset.move), b); });
       const fx = el.querySelector('[data-fix]');
       if (fx) fx.onclick = async () => {
         fx.disabled = true;
@@ -816,6 +895,15 @@
     }
   }
 
+  async function move(r, dir, btn) {
+    btn.disabled = true;
+    try {
+      const res = await call('move', { uid: r.uid, dir });
+      if (res.moved) { changed(1); toast(dir < 0 ? '위로 옮겼어요.' : '아래로 옮겼어요.'); }
+      await loadList({ quiet: true });
+    } catch (e) { toast(e.message); btn.disabled = false; }
+  }
+
   async function remove(r) {
     if (!confirm(`'${r.title || r.item}'을(를) 삭제할까요?\n시트에서 지워지고, 앱으로 올린 파일은 드라이브 휴지통으로 가요(30일 안에 되살릴 수 있어요).`)) return;
     try {
@@ -825,6 +913,26 @@
       drawList();
     } catch (e) { toast(e.message); }
   }
+
+  /* 썸네일 붙여넣기: 화면 캡처 뒤 Ctrl+V → 열려 있는 쪽(고치기 창 또는 올리기의 웹 자료)에 넣음 */
+  function setThumb(input, box, file) {
+    const dt = new DataTransfer();
+    dt.items.add(new File([file], file.name && file.name !== 'image.png' ? file.name : `캡처-${Date.now()}.png`, { type: file.type || 'image/png' }));
+    input.files = dt.files;
+    const url = URL.createObjectURL(file);
+    box.innerHTML = `<img src="${url}" alt="붙여넣은 썸네일"><span>붙여넣은 그림이 썸네일로 들어가요. <button type="button" class="btn btn--sm">빼기</button></span>`;
+    box.querySelector('button').onclick = () => { input.value = ''; box.innerHTML = '<span>다시 캡처해서 <b>Ctrl+V</b></span>'; };
+  }
+  document.addEventListener('paste', (e) => {
+    const item = [...(e.clipboardData ? e.clipboardData.items : [])].find((x) => String(x.type).indexOf('image') === 0);
+    if (!item) return;
+    const file = item.getAsFile();
+    if (!file) return;
+    if ($('edit').open && !$('eThumbF').hidden) { e.preventDefault(); setThumb($('eThumb'), $('eThumbPaste'), file); $('eThumbDrop').checked = false; return; }
+    if (!$('up').hidden && kind() === 'web') { e.preventDefault(); setThumb($('thumb'), $('thumbPaste'), file); return; }
+    toast('썸네일은 웹 자료를 올리거나 고칠 때 붙여 넣을 수 있어요.');
+  });
+  $('thumb').addEventListener('change', () => { $('thumbPaste').innerHTML = '<span>또는 화면 캡처(Win+Shift+S) 뒤 이 화면에서 <b>Ctrl+V</b></span>'; });
 
   let editing = null;
   function openEdit(r) {
@@ -840,6 +948,7 @@
     $('eTitle').value = r.title; $('eDesc').value = r.desc;
     $('eUrl').value = r.link;
     $('eFile').value = ''; $('eLink').value = r.link; $('eThumb').value = ''; $('eThumbDrop').checked = false;
+    $('eThumbPaste').innerHTML = '<span>또는 화면 캡처 뒤 <b>Ctrl+V</b></span>';
     const opener = (a, v) => { const ok = /^https?:/i.test(v); a.hidden = !ok; if (ok) a.href = v; };
     opener($('eLinkOpen'), r.link); opener($('eUrlOpen'), r.link);
     $('eLink').oninput = () => opener($('eLinkOpen'), $('eLink').value.trim());

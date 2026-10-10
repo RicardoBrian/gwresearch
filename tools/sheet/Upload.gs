@@ -51,6 +51,7 @@ function api(code, action, p) {
     case 'expand': return expand_(p);
     case 'state': return deployState_();
     case 'deploy': return deployNow_();
+    case 'move': return move_(p);
   }
   throw new Error('알 수 없는 요청입니다.');
 }
@@ -432,7 +433,7 @@ function list_() {
     stages: stages_(),
     rows: rows.map((r) => ({
       uid: r.uid, row: r.row, stage: r.stage, item: r.item, group: r.group, title: r.title, desc: r.desc,
-      by: r.by, at: r.at, kind: kindOf_(r), link: r.youtube || r.file, thumb: r.thumb, st: saved[r.uid] || null,
+      by: r.by, at: r.at, kind: kindOf_(r), link: r.youtube || r.file, thumb: r.thumb, sub: r.sub || '', st: saved[r.uid] || null,
     })),
     deploy: deployState_(),
   };
@@ -719,6 +720,29 @@ function update_(p) {
   check_([p.uid]);
   markDirty_();
   return { ok: true };
+}
+
+// 순서 바꾸기: 같은 항목·같은 분류 안에서 바로 위(dir -1)·아래(dir 1) 자료와 자리를 바꿈 (시트 줄을 실제로 옮김 → 사이트 순서)
+function move_(p) {
+  const t = table_();
+  const rows = rows_(t); // 관리번호 붙이기(잠금)를 먼저 끝냄
+  const cur = rows.find((r) => r.uid === p.uid);
+  if (!cur) throw new Error('자료를 찾지 못했습니다. 목록을 새로 고쳐 주세요.');
+  const same = rows.filter((r) => norm_(r.item) === norm_(cur.item) && norm_(r.group) === norm_(cur.group)
+    && kindOf_(r) !== 'stageintro' && kindOf_(cur) !== 'stageintro');
+  const k = same.findIndex((r) => r.uid === cur.uid);
+  const other = same[k + (p.dir < 0 ? -1 : 1)];
+  if (!other) return { ok: true, moved: false };
+  withLock_(() => {
+    // 그 사이 줄이 바뀌었을 수 있어 관리번호로 다시 찾음
+    const a = findRow_(t, cur.uid);
+    const b = findRow_(t, other.uid);
+    if (!a || !b) throw new Error('그 사이 자료가 바뀌었습니다. 목록을 새로 고쳐 주세요.');
+    // 위로: 위 자료 줄 앞에 / 아래로: 아래 자료 줄 뒤에
+    t.sh.moveRows(t.sh.getRange(a, 1, 1, t.sh.getMaxColumns()), p.dir < 0 ? b : b + 1);
+  });
+  markDirty_();
+  return { ok: true, moved: true };
 }
 
 function remove_(uid) {
