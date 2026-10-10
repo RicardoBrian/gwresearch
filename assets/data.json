@@ -1,6 +1,6 @@
 {
   "updated": "2026-10-10",
-  "version": "20261010002607",
+  "version": "20261010002617",
   "materials": [
     {
       "item": "bilingual-education",
@@ -36,22 +36,6 @@
       "youtube": "aqz-KE-bpKQ",
       "title": "또래멘토링 활동 영상",
       "desc": "견본 영상입니다."
-    },
-    {
-      "item": "life-adaptation",
-      "type": "web",
-      "url": "https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz012345/preview",
-      "embed": true,
-      "image": "https://drive.google.com/thumbnail?id=1ZZZZZZZZZZZZZZZZZZZZZZZZ&sz=w800",
-      "title": "앱A"
-    },
-    {
-      "item": "life-adaptation",
-      "type": "web",
-      "url": "https://docs.google.com/document/d/1BbCdEfGhIjKlMnOpQrStUvWxYz012345/preview",
-      "embed": true,
-      "image": "https://drive.google.com/thumbnail?id=1BbCdEfGhIjKlMnOpQrStUvWxYz012345&sz=w800",
-      "title": "앱B"
     }
   ],
   "intros": {
