@@ -64,6 +64,9 @@ KEY_NAMES = {"stage": "단계", "item": "항목", "group": "분류", "sub": "소
              "file": "PDF 링크", "youtube": "유튜브 링크", "desc": "설명",
              "thumb": "썸네일"}
 UA = {"User-Agent": "Mozilla/5.0 (gwresearch build)"}
+# 창 안에 띄우면 빈 화면이 되는데 머리글로는 알 수 없는 곳 → 처음부터 '새 창에서 열기' 카드
+#  (학교 계정 전용 앱스스크립트는 바깥 방문자에게 로그인 화면이 뜸, 블루킷·워드월은 실제로 확인)
+NO_EMBED = re.compile(r"^https://(?:script\.google\.com/a/|(?:[\w-]+\.)*blooket\.com/|(?:[\w-]+\.)*wordwall\.net/)", re.I)
 
 
 def norm(s):
@@ -580,6 +583,8 @@ def main():
                                       "주소를 확인해 주세요 (www 를 빼거나 붙여 보기, 브라우저 주소창에서 열어 보기).")
                         continue
                     page_title, embed, image = got
+                    if NO_EMBED.match(f):
+                        embed = False
                 # 제목 칸이 비면 사이트 제목 → 사이트 주소(분류 이름을 제목으로 쓰면 '웹' 같은 카드가 여러 개 생김)
                 title = row.get("title") or page_title or urllib.parse.urlsplit(f).hostname or "웹 페이지"
                 m.update(type="web", url=f, embed=embed and f.lower().startswith("https://"))
