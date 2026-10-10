@@ -814,9 +814,14 @@ html.has-modal { overflow: hidden; }
 
 .card__meta {
   align-self: end;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2; /* 길면 두 줄까지, 뒤는 … */
+  -webkit-box-orient: vertical;
   color: var(--green);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
 }
 
 .card__meta.is-empty { color: #9aa294; font-weight: 500; }

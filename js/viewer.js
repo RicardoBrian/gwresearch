@@ -90,11 +90,13 @@
 
   const groupPath = (item, name) => `${item.id}/${encodeURIComponent(name)}`;
 
-  // 카드 아래 한 줄: 자료 제목 2~3개 (보는 사람에게 '무슨 내용'이 있는지)
+  // 카드 아래 설명: 자료 제목 2개 + 외 N (보는 사람에게 '무슨 내용'이 있는지)
+  // 파일 이름 앞의 꼬리표([2025 보도자료 15], (붙임1) 등)는 떼고 내용만. 자료를 열면 원래 제목 그대로
   function titlesOf(list) {
     if (!list.length) return '자료 준비 중';
-    const names = [...new Set(list.map((m) => m.title).filter(Boolean))];
-    return names.slice(0, 3).join(' · ') + (names.length > 3 ? ` 외 ${names.length - 3}` : '');
+    const clean = (t) => String(t).replace(/^\s*(?:[\[(【［（][^\])】］）]{0,40}[\])】］）]\s*)+/, '').replace(/[-_\s]+$/, '').trim() || t;
+    const names = [...new Set(list.map((m) => clean(m.title || '')).filter(Boolean))];
+    return names.slice(0, 2).join(' · ') + (names.length > 2 ? ` 외 ${names.length - 2}` : '');
   }
 
   const ICON = {
