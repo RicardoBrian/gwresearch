@@ -90,12 +90,11 @@
 
   const groupPath = (item, name) => `${item.id}/${encodeURIComponent(name)}`;
 
-  function summary(list) {
+  // 카드 아래 한 줄: 자료 제목 2~3개 (보는 사람에게 '무슨 내용'이 있는지)
+  function titlesOf(list) {
     if (!list.length) return '자료 준비 중';
-    const pdf = list.filter((m) => m.type === 'pdf').length;
-    const video = list.filter((m) => m.type === 'video').length;
-    const web = list.filter((m) => m.type === 'web').length;
-    return [pdf && `문서 ${pdf}`, video && `영상 ${video}`, web && `웹 ${web}`].filter(Boolean).join(' · ');
+    const names = [...new Set(list.map((m) => m.title).filter(Boolean))];
+    return names.slice(0, 3).join(' · ') + (names.length > 3 ? ` 외 ${names.length - 3}` : '');
   }
 
   const ICON = {
@@ -254,7 +253,7 @@
     await dataReady;
     const cards = stage.items.map((it) => {
       const list = materials.get(it.id) || [];
-      let meta = !list.length && intros[it.id] ? '소개' : summary(list);
+      let meta = !list.length && intros[it.id] ? '소개 카드뉴스' : titlesOf(list);
       if (hasGroups(list)) {
         const names = groupsOf(list).map((g) => g.name);
         meta = names.slice(0, 3).join(' · ') + (names.length > 3 ? ` 외 ${names.length - 3}` : '');
@@ -552,7 +551,7 @@
     const cards = groups.map((g) => `
       <li><a class="card" href="#${esc(groupPath(item, g.name))}">
         <span class="card__title">${esc(g.name)}</span>
-        <span class="card__meta">${esc(summary(g.list))}</span>
+        <span class="card__meta">${esc(titlesOf(g.list))}</span>
         <span class="card__arrow">${ICON.next}</span>
       </a></li>`).join('');
     mount(`
