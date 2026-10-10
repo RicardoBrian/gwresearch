@@ -263,6 +263,7 @@
         <li><a class="card" href="#${esc(it.id)}">
           <span class="card__title">${esc(it.title)}</span>
           <span class="card__meta${list.length || intros[it.id] ? '' : ' is-empty'}">${esc(meta)}</span>
+          ${intros[it.id] ? '' : '<span class="card__todo">카드뉴스 준비 중</span>'}
           <span class="card__arrow">${ICON.next}</span>
         </a></li>`;
     }).join('');
@@ -273,8 +274,8 @@
         crumb: '<span>학생 성장 지원 로드맵</span>',
         tabs: stageTabs(stage),
       })}
-      <div class="viewer__body viewer__body--stage${intros[stage.id] ? ' has-intro' : ''}">
-        ${intros[stage.id] ? introMarkup(stage.name) : ''}
+      <div class="viewer__body viewer__body--stage has-intro">
+        ${intros[stage.id] ? introMarkup(stage.name) : introEmpty()}
         <ul class="cards">${cards}</ul>
       </div>`);
     if (intros[stage.id]) showIntro(dialog.querySelector('.intro'), intros[stage.id]);
@@ -293,6 +294,14 @@
       const t = box.querySelector('.loading__text');
       if (t && total) t.textContent = `불러오는 중… ${Math.min(99, Math.round((loaded / total) * 100))}%`;
     };
+  }
+
+  // 카드뉴스가 아직 없는 자리: 어디가 빠졌는지 보이게
+  function introEmpty() {
+    return `
+      <section class="intro intro--empty" aria-label="소개 카드뉴스 준비 중">
+        <div class="intro__empty">${ICON.intro}<span>소개 카드뉴스 준비 중</span></div>
+      </section>`;
   }
 
   function introMarkup(name) {
@@ -384,7 +393,7 @@
     const mats = list.filter((m) => m.type !== 'intro');
     if (!loadFailed && mats.length > 1) {
       if (!pick || !list[pick - 1]) {
-        renderGallery({ item, stage, title, crumb, list, base, intro: list[0].type === 'intro' ? list[0].file : '' });
+        renderGallery({ item, stage, title, crumb, list, base, intro: list[0].type === 'intro' ? list[0].file : '', slot: !current });
         return;
       }
     }
@@ -403,6 +412,10 @@
     }
     if (!list.length) {
       body.innerHTML = state('자료 준비 중입니다.', '이 항목의 자료는 곧 올라올 예정입니다.', stage);
+      if (!current) {
+        body.className = 'viewer__body viewer__body--stage has-intro';
+        body.innerHTML = introEmpty() + body.innerHTML;
+      }
       return;
     }
 
@@ -497,7 +510,7 @@
     return '';
   }
 
-  function renderGallery({ item, stage, title, crumb, list, base, intro }) {
+  function renderGallery({ item, stage, title, crumb, list, base, intro, slot }) {
     const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
     const LABEL = { pdf: 'PDF', video: '영상', web: '웹' };
     const cards = list.map((m, k) => {
@@ -520,8 +533,8 @@
     }).join('');
     mount(`
       ${head({ stage, title, crumb })}
-      <div class="viewer__body viewer__body--stage${intro ? ' has-intro' : ''}">
-        ${intro ? introMarkup(item.title) : ''}
+      <div class="viewer__body viewer__body--stage${intro || slot ? ' has-intro' : ''}">
+        ${intro ? introMarkup(item.title) : slot ? introEmpty() : ''}
         <ul class="tcards">${cards}</ul>
       </div>`);
     // 그림이 안 열리면(공유 꺼짐·주소 바뀜) 뒤의 기본 그림이 보이게
@@ -548,8 +561,8 @@
         title: item.title,
         crumb: stageLink,
       })}
-      <div class="viewer__body viewer__body--stage${intros[item.id] ? ' has-intro' : ''}">
-        ${intros[item.id] ? introMarkup(item.title) : ''}
+      <div class="viewer__body viewer__body--stage has-intro">
+        ${intros[item.id] ? introMarkup(item.title) : introEmpty()}
         <ul class="cards">${cards}</ul>
       </div>`);
     if (intros[item.id]) showIntro(dialog.querySelector('.intro'), intros[item.id]);

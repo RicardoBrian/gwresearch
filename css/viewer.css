@@ -658,6 +658,33 @@ html.has-modal { overflow: hidden; }
 
 .intro { position: relative; min-width: 0; }
 
+/* 카드뉴스가 아직 없는 자리 (정사각형 점선 상자) */
+.intro__empty {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  aspect-ratio: 1;
+  border: 2px dashed var(--line);
+  border-radius: 18px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.intro__empty svg { width: 40px; height: 40px; color: #a9b3a0; }
+
+.card__todo {
+  justify-self: start;
+  padding: 2px 9px;
+  border: 1px dashed #c4ccbb;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .intro__track {
   display: flex;
   overflow-x: auto;
