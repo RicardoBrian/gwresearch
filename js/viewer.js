@@ -522,7 +522,7 @@
       const src = thumbOf(m);
       const ph = m.type === 'web' ? host(m.url) : m.type === 'video' ? '영상' : 'PDF 문서';
       return `
-      <li><a class="tcard" href="#${esc(base)}/${k + 1}">
+      <li data-sub="${esc((m.sub || '').trim())}"><a class="tcard" href="#${esc(base)}/${k + 1}">
         <span class="tcard__thumb is-${esc(m.type)}">
           <span class="tcard__ph">${ICON[m.type] || ICON.pdf}<span>${esc(ph)}</span></span>
           ${src ? `<img src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}
@@ -535,11 +535,19 @@
         </span>
       </a></li>`;
     }).join('');
+    const mats = list.filter((m) => m.type !== 'intro');
+    const subs = [...new Set(mats.map((m) => (m.sub || '').trim()).filter(Boolean))];
+    const subBar = subs.length > 1 ? `
+      <div class="subfilter tgal__subs" role="group" aria-label="소분류">
+        <button class="subfilter__btn" type="button" data-sub="" aria-pressed="true">전체 <small>${mats.length}</small></button>
+        ${subs.map((x) => `<button class="subfilter__btn" type="button" data-sub="${esc(x)}" aria-pressed="false">${esc(x)}
+          <small>${mats.filter((m) => (m.sub || '').trim() === x).length}</small></button>`).join('')}
+      </div>` : '';
     mount(`
       ${head({ stage, title, crumb })}
       <div class="viewer__body viewer__body--stage${intro || slot ? ' has-intro' : ''}">
         ${intro ? introMarkup(item.title) : slot ? introEmpty() : ''}
-        ${cards.trim() ? `<ul class="tcards">${cards}</ul>` : `<div class="state"><p class="state__title">자료 준비 중입니다.</p><p class="state__text">이 항목의 자료는 곧 올라올 예정입니다.</p></div>`}
+        ${cards.trim() ? `<div class="tgal">${subBar}<ul class="tcards">${cards}</ul></div>` : `<div class="state"><p class="state__title">자료 준비 중입니다.</p><p class="state__text">이 항목의 자료는 곧 올라올 예정입니다.</p></div>`}
       </div>`);
     // 그림이 안 열리면(공유 꺼짐·주소 바뀜) 뒤의 기본 그림이 보이게
     dialog.querySelectorAll('.tcard__thumb img').forEach((img) => {
@@ -548,6 +556,12 @@
       // 드라이브 미리보기는 권한이 없으면 아주 작은 빈 그림이 올 때가 있음
       img.addEventListener('load', () => { if (img.naturalWidth < 40) drop(); });
     });
+    // 소분류(과목 등) 버튼: 누르면 그 소분류 카드만
+    dialog.querySelectorAll('.tgal .subfilter__btn').forEach((btn) => btn.addEventListener('click', () => {
+      const x = btn.dataset.sub;
+      dialog.querySelectorAll('.tgal .subfilter__btn').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+      dialog.querySelectorAll('.tcards > li').forEach((li) => { li.hidden = Boolean(x) && li.dataset.sub !== x; });
+    }));
     if (intro) showIntro(dialog.querySelector('.intro'), intro);
   }
 

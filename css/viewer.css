@@ -862,6 +862,11 @@ html.has-modal { overflow: hidden; }
 .card:active { background: var(--green-soft); }
 .card:focus-visible .card__arrow { background: var(--green); color: #fff; }
 
+/* 카드 화면의 소분류 버튼 줄 */
+.tgal { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.tgal .tgal__subs { display: flex; padding: 0; border-bottom: 0; flex-wrap: wrap; overflow: visible; }
+.tcards > li[hidden] { display: none; }
+
 /* ---------- 웹앱 썸네일 카드 ---------- */
 .tcards {
   display: grid;
