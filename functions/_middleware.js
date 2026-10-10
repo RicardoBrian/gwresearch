@@ -10,6 +10,12 @@
 const COOKIE = 'gw_auth';
 const enc = new TextEncoder();
 
+// gwansan.com/연구입력 → 자료 올리기 앱 (앱은 업로드 코드로 잠겨 있어 사이트 비밀번호 없이 넘김)
+// 앱을 [배포 관리 → 수정 → 새 버전]으로 고치면 주소가 그대로라 여기는 안 바꿔도 됨
+const SHORTCUTS = {
+  '/연구입력': 'https://script.google.com/macros/s/AKfycby4VTU5X9WWb91WUkrPG_f0klDqD8I9ulMKZrg6IOYgc6DwnKY7RoRj0myGp7UgmyAlTw/exec',
+};
+
 // 로그인 화면에 필요한 파일만 잠금 없이
 const OPEN = [
   /^\/favicon\.ico$/,
@@ -18,6 +24,9 @@ const OPEN = [
 
 export async function onRequest({ request, env, next }) {
   const url = new URL(request.url);
+  const shortcut = SHORTCUTS[safeDecode(url.pathname).replace(/\/+$/, '')];
+  if (shortcut) return Response.redirect(shortcut, 302);
+
   const password = env.SITE_PASSWORD;
   if (!password) {
     return text('사이트 비밀번호(SITE_PASSWORD)가 설정되지 않았습니다. Cloudflare 설정에서 추가해 주세요.', 503);
@@ -135,4 +144,8 @@ function loginPage(failed) {
     status: failed ? 401 : 200,
     headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
   });
+}
+
+function safeDecode(path) {
+  try { return decodeURIComponent(path); } catch (e) { return path; }
 }
