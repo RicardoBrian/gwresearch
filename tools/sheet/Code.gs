@@ -4,7 +4,7 @@
  * 시트 메뉴 [사이트 반영 → 지금 사이트에 반영하기] → Cloudflare 배포 훅 호출
  */
 const DEPLOY_HOOK = 'https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/여기에-주소';
-const SITE_URL = 'https://gwresearch.pages.dev';
+const SITE_URL = 'https://gwansan.com';
 
 function onOpen() {
   SpreadsheetApp.getUi()

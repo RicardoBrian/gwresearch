@@ -19,7 +19,8 @@
   (고급) '소분류' 열을 추가하면 같은 분류 안에서 칩 버튼으로 걸러 봄
 
 드라이브 PDF 는 배포 때 앞부분만 확인하고(PDF 여부·공유·파일 이름), 파일은 올리지 않는다.
-방문자가 열 때 Cloudflare 함수(functions/pdf/[id].js)가 드라이브에서 가져와 1시간 캐시한다.
+방문자가 열 때 Cloudflare 함수(functions/pdf/[id].js)가 드라이브에서 가져와 7일 보관한다(배포마다 새로).
+썸네일(PDF 첫 쪽·영상 장면·웹 대표 이미지)은 배포 때 assets/thumbs/ 에 받아 둔다(실패하면 사이트가 원래 주소에서 받음).
 링크 확인은 8개씩 동시에 한다. 문제가 있는 행은 행 번호와 함께 한국어로 알려주고 빼고 배포한다
 (남는 자료가 하나도 없을 때만 실패). 파일·유튜브가 둘 다 빈 줄(입력 중)은 건너뛴다.
 
@@ -28,6 +29,7 @@
 import csv
 import datetime
 import functools
+import hashlib
 import io
 import json
 import os
@@ -43,6 +45,7 @@ from html import unescape as html_unescape
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DOCS = ROOT / "assets" / "docs"
+THUMBS = ROOT / "assets" / "thumbs"  # 배포 때 받아 두는 썸네일 (저장소에는 올리지 않음)
 
 # 시트 열 제목 → 내부 이름 (옛 열 제목도 받아줌)
 COLS = {
@@ -411,6 +414,58 @@ def write_report(count, errors, warnings):
 """, encoding="utf-8")
 
 
+def thumb_source(m):
+    """썸네일 원래 주소 (js/viewer.js thumbOf 와 같은 규칙)"""
+    if m.get("image"):
+        return m["image"]
+    if m.get("type") == "pdf":
+        mm = re.match(r"pdf/([\w-]+)$", m.get("file", ""))
+        return f"https://drive.google.com/thumbnail?id={mm.group(1)}&sz=w800" if mm else ""
+    if m.get("type") == "video":
+        if m.get("drive"):
+            return f"https://drive.google.com/thumbnail?id={m['drive']}&sz=w800"
+        if m.get("youtube"):
+            return f"https://i.ytimg.com/vi/{m['youtube']}/hqdefault.jpg"
+    return ""
+
+
+def fetch_thumb(url):
+    """그림을 받아 assets/thumbs/ 에 저장 → 사이트 경로. 그림이 아니거나 실패하면 '' """
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=20) as r:
+            ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            body = r.read(3_000_001)
+    except Exception:  # noqa: BLE001
+        return ""
+    ext = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}.get(ctype)
+    if not ext or len(body) < 500 or len(body) > 3_000_000:
+        return ""
+    path = THUMBS / f"{hashlib.sha1(url.encode()).hexdigest()[:16]}.{ext}"
+    try:
+        THUMBS.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(body)
+    except OSError:
+        return ""
+    return path.relative_to(ROOT).as_posix()
+
+
+def save_thumbs(materials):
+    """썸네일을 배포에 넣어 두면 방문자가 구글을 거치지 않고 바로 받음.
+    받지 못한 것은 그대로 두고(사이트가 원래 주소에서 받음), 이 단계 때문에 배포가 멈추지 않게 함"""
+    try:
+        THUMBS.mkdir(parents=True, exist_ok=True)
+        urls = sorted({u for u in map(thumb_source, materials) if u.startswith("https://")})
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            got = dict(zip(urls, pool.map(fetch_thumb, urls)))
+        for m in materials:
+            path = got.get(thumb_source(m))
+            if path:
+                m["thumb"] = path
+        print(f"썸네일: {sum(1 for p in got.values() if p)}/{len(urls)}개 미리 받음")
+    except Exception as e:  # noqa: BLE001
+        print(f"참고: 썸네일을 미리 받지 못했습니다 ({e}). 사이트가 원래 주소에서 받습니다.")
+
+
 def main():
     roadmap = load_roadmap()
     ids = [i for i, _, _ in roadmap]
@@ -590,7 +645,10 @@ def main():
             sys.exit(1)
     write_report(len(out), errors, warnings)
 
-    data = {"updated": datetime.date.today().isoformat(), "materials": out, "intros": intros}
+    save_thumbs(out)
+    # version: 배포마다 바뀜 → 문서 보관(functions/pdf)이 배포 때마다 새로 받게
+    data = {"updated": datetime.date.today().isoformat(), "version": datetime.datetime.now().strftime("%Y%m%d%H%M%S"),
+            "materials": out, "intros": intros}
     (ROOT / "assets" / "data.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"완료: 자료 {len(out)}개 → assets/data.json")
 

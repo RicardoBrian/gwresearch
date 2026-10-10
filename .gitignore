@@ -6,3 +6,6 @@ __pycache__/
 
 # 배포 때 만드는 반영 결과 페이지
 report.html
+
+# 배포 때 받아 두는 썸네일
+assets/thumbs/
