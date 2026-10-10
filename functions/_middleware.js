@@ -38,7 +38,7 @@ export async function onRequest({ request, env, next }) {
     return new Response(null, { status: 303, headers: { Location: '/', 'Set-Cookie': cookie('', 0) } });
   }
 
-  if (await isValid(readCookie(request), password)) return next();
+  if (await isValid(readCookie(request), password)) return fresh(await next());
 
   const wantsPage = request.method === 'GET' && (request.headers.get('Accept') || '').includes('text/html');
   return wantsPage ? loginPage(false) : text('로그인이 필요합니다.', 401);
@@ -148,4 +148,12 @@ function loginPage(failed) {
 
 function safeDecode(path) {
   try { return decodeURIComponent(path); } catch (e) { return path; }
+}
+
+// 페이지(HTML)는 늘 새로 받게 → 배포하면 바로 새 화면 파일(?v=배포번호)을 가리킴
+function fresh(res) {
+  if (!(res.headers.get('Content-Type') || '').includes('text/html')) return res;
+  const out = new Response(res.body, res);
+  out.headers.set('Cache-Control', 'no-cache');
+  return out;
 }

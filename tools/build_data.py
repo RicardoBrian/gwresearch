@@ -651,6 +651,21 @@ def main():
             "materials": out, "intros": intros}
     (ROOT / "assets" / "data.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"완료: 자료 {len(out)}개 → assets/data.json")
+    if os.environ.get("CF_PAGES"):  # Cloudflare 배포 때만 (저장소의 index.html 은 그대로)
+        stamp_assets(data["version"])
+
+
+def stamp_assets(version):
+    """index.html 의 css·js 주소 끝에 ?v=배포번호 → 브라우저·Cloudflare 가 예전 화면 파일을 계속 쓰지 않게
+    (gwansan.com 도메인 설정이 css·js 를 몇 시간씩 보관함). 실패해도 배포는 계속"""
+    try:
+        path = ROOT / "index.html"
+        html = path.read_text(encoding="utf-8")
+        html, n = re.subn(r'((?:href|src)="(?:css|js)/[\w.-]+\.(?:css|js))(?:\?v=[^"]*)?"', rf'\1?v={version}"', html)
+        path.write_text(html, encoding="utf-8")
+        print(f"화면 파일 {n}개에 배포 번호 붙임")
+    except Exception as e:  # noqa: BLE001
+        print(f"참고: 화면 파일 배포 번호를 붙이지 못했습니다 ({e}).")
 
 
 if __name__ == "__main__":
