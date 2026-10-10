@@ -9,6 +9,8 @@
   const dialog = document.getElementById('viewer');
   const DATA_URL = 'assets/data.json';
   const PDFJS = new URL('assets/vendor/pdfjs/', document.baseURI).href;
+  // 항목에 들어가면 자료가 1개여도 카드 화면부터 (false 로 바꾸면 예전처럼 1개면 바로 열림)
+  const ITEM_CARDS_ALWAYS = true;
 
   // ---- 로드맵 구조는 index.html 이 원본 ----
   const stages = [...document.querySelectorAll('.stage')].map((el) => ({
@@ -389,10 +391,11 @@
       ? `${stageLink}<span class="viewer__sep" aria-hidden="true">›</span><a class="viewer__crumbitem" href="#${esc(item.id)}" data-replace>${esc(item.title)}</a>`
       : stageLink;
 
-    // 자료가 2개 이상이면 썸네일 카드부터 (고르면 #…/번호 로 들어가 지금처럼 창 안에서 엶)
+    // 항목 첫 화면: 카드뉴스 + 자료 카드 (고르면 #…/번호 로 들어가 지금처럼 창 안에서 엶)
+    // ITEM_CARDS_ALWAYS 가 true 면 자료가 1개여도 카드부터, false 면 2개 이상일 때만 (예전 방식)
     const title = current ? current.name : item.title;
     const mats = list.filter((m) => m.type !== 'intro');
-    if (!loadFailed && mats.length > 1) {
+    if (!loadFailed && (ITEM_CARDS_ALWAYS ? list.length >= 1 : mats.length > 1)) {
       if (!pick || !list[pick - 1]) {
         renderGallery({ item, stage, title, crumb, list, base, intro: list[0].type === 'intro' ? list[0].file : '', slot: !current });
         return;
@@ -536,7 +539,7 @@
       ${head({ stage, title, crumb })}
       <div class="viewer__body viewer__body--stage${intro || slot ? ' has-intro' : ''}">
         ${intro ? introMarkup(item.title) : slot ? introEmpty() : ''}
-        <ul class="tcards">${cards}</ul>
+        ${cards.trim() ? `<ul class="tcards">${cards}</ul>` : `<div class="state"><p class="state__title">자료 준비 중입니다.</p><p class="state__text">이 항목의 자료는 곧 올라올 예정입니다.</p></div>`}
       </div>`);
     // 그림이 안 열리면(공유 꺼짐·주소 바뀜) 뒤의 기본 그림이 보이게
     dialog.querySelectorAll('.tcard__thumb img').forEach((img) => {
