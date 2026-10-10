@@ -218,11 +218,12 @@
 
   // 머리글: [위치 표시 / 제목]  ……  [닫기]
   // 단계 화면은 제목 대신 단계 탭(①~⑤)을 보여줌 — 지금 단계가 보이고 다른 단계로 바로 이동
-  function head({ stage, title, crumb, tabs = '' }) {
+  // up: 왼쪽 위 ‹ 가 가는 곳 = 바로 한 단계 위 (자료 → 카드 화면 → 분류 → 단계)
+  function head({ stage, title, crumb, tabs = '', up = '' }) {
     return `
       <header class="viewer__head${tabs ? ' has-tabs' : ''}">
         <div class="viewer__heading">
-          <div class="viewer__crumb">${crumb}</div>
+          <div class="viewer__crumb">${up ? `<a class="viewer__up" href="#${esc(up)}" data-replace aria-label="한 단계 위로" title="한 단계 위로"></a>` : ''}${crumb}</div>
           <div class="viewer__titleline">
             <h2 class="viewer__title${tabs ? ' sr-only' : ''}" id="viewer-title" tabindex="-1">${esc(title)}</h2>
           </div>
@@ -397,7 +398,7 @@
     const mats = list.filter((m) => m.type !== 'intro');
     if (!loadFailed && (ITEM_CARDS_ALWAYS ? list.length >= 1 : mats.length > 1)) {
       if (!pick || !list[pick - 1]) {
-        renderGallery({ item, stage, title, crumb, list, base, intro: list[0].type === 'intro' ? list[0].file : '', slot: !current });
+        renderGallery({ item, stage, title, crumb, list, base, intro: list[0].type === 'intro' ? list[0].file : '', slot: !current, up: current ? item.id : stage.id });
         return;
       }
     }
@@ -406,6 +407,7 @@
         stage,
         title,
         crumb: pick ? `${crumb}<span class="viewer__sep" aria-hidden="true">›</span><a class="viewer__crumbitem" href="#${esc(base)}" data-replace>전체 보기</a>` : crumb,
+        up: pick ? base : current ? item.id : stage.id,
       })}
       <div class="viewer__body"></div>`);
     const body = dialog.querySelector('.viewer__body');
@@ -514,7 +516,7 @@
     return '';
   }
 
-  function renderGallery({ item, stage, title, crumb, list, base, intro, slot }) {
+  function renderGallery({ item, stage, title, crumb, list, base, intro, slot, up }) {
     const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
     const LABEL = { pdf: 'PDF', video: '영상', web: '웹' };
     const cards = list.map((m, k) => {
@@ -544,7 +546,7 @@
           <small>${mats.filter((m) => (m.sub || '').trim() === x).length}</small></button>`).join('')}
       </div>` : '';
     mount(`
-      ${head({ stage, title, crumb })}
+      ${head({ stage, title, crumb, up })}
       <div class="viewer__body viewer__body--stage${intro || slot ? ' has-intro' : ''}">
         ${intro ? introMarkup(item.title) : slot ? introEmpty() : ''}
         ${cards.trim() ? `<div class="tgal">${subBar}<ul class="tcards">${cards}</ul></div>` : `<div class="state"><p class="state__title">자료 준비 중입니다.</p><p class="state__text">이 항목의 자료는 곧 올라올 예정입니다.</p></div>`}
@@ -578,6 +580,7 @@
         stage: item.stage,
         title: item.title,
         crumb: stageLink,
+        up: item.stage.id,
       })}
       <div class="viewer__body viewer__body--stage has-intro">
         ${intros[item.id] ? introMarkup(item.title) : introEmpty()}

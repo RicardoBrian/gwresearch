@@ -119,17 +119,34 @@ html.has-modal { overflow: hidden; }
   transition: background-color .2s;
 }
 
-.viewer__back::before {
+/* 왼쪽 위 ‹ : 한 단계 위로 (자료 → 카드 화면 → 분류 → 단계) */
+.viewer__up {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin: 0 2px 0 -8px;
+  border-radius: 50%;
+  color: inherit;
+  transition: background-color .2s;
+}
+
+.viewer__up::before {
   content: "";
-  width: 14px;
-  height: 14px;
-  margin-left: 4px;
-  margin-right: -3px;
+  width: 16px;
+  height: 16px;
   background: currentColor;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15 5l-7 7 7 7' fill='none' stroke='%23000' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15 5l-7 7 7 7' fill='none' stroke='%23000' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
   transition: transform .25s var(--ease);
 }
+
+.viewer__up:hover { background: rgba(69, 109, 42, .1); }
+.viewer__up:hover::before { transform: translateX(-3px); }
+.viewer__up:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+
+.viewer__back::before { display: none; } /* 화살표는 따로 ‹ 버튼(.viewer__up) */
 
 .viewer__back:hover { background: rgba(69, 109, 42, .1); }
 
@@ -153,7 +170,6 @@ html.has-modal { overflow: hidden; }
 }
 
 .viewer__crumbitem:hover { background: rgba(69, 109, 42, .1); }
-.viewer__back:hover::before { transform: translateX(-3px); }
 
 .viewer__titleline {
   min-width: 0;
