@@ -723,6 +723,8 @@ html.has-modal { overflow: hidden; }
   display: block;
 }
 
+img.intro__card { object-fit: contain; min-width: 0; }
+
 .intro__nav {
   position: absolute;
   top: calc(50% - 14px);

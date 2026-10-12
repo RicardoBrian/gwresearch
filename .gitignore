@@ -9,3 +9,6 @@ report.html
 
 # 배포 때 받아 두는 썸네일
 assets/thumbs/
+
+# 배포 때 만드는 카드뉴스 그림
+assets/intros/

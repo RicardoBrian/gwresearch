@@ -34,6 +34,8 @@
   // ---- 자료 목록 ----
   let materials = new Map();
   let intros = {};
+  let introPages = {}; // 카드뉴스 PDF → 배포 때 만든 쪽 그림 (있으면 PDF 를 그리지 않고 바로 보여줌)
+  let version = '';
   let loadFailed = false;
   const dataReady = fetch(DATA_URL, { cache: 'no-cache' })
     .then((r) => {
@@ -44,6 +46,8 @@
     })
     .then((data) => {
       intros = data.intros || {};
+      introPages = data.introPages || {};
+      version = data.version || '';
       for (const m of data.materials || []) {
         if (!materials.has(m.item)) materials.set(m.item, []);
         materials.get(m.item).push(m);
@@ -160,6 +164,18 @@
     e.preventDefault();
     go(route.path, a.hasAttribute('data-replace'));
   });
+
+  // 단계·항목에 손가락·마우스를 올리면 그 카드뉴스 첫 장을 미리 받음
+  const warmLink = (e) => {
+    const a = e.target.closest?.('a[href^="#"]');
+    if (!a) return;
+    let id = a.getAttribute('href').slice(1).split('/')[0];
+    try { id = decodeURIComponent(id); } catch { return; }
+    dataReady.then(() => warmIntro(id));
+  };
+  ['pointerover', 'touchstart', 'focusin'].forEach((t) => document.addEventListener(t, warmLink, { passive: true }));
+  // 첫 화면이 다 뜬 뒤 쉬는 틈에 다섯 단계 카드뉴스 첫 장 (단계를 가장 먼저 누르므로)
+  window.addEventListener('load', () => dataReady.then(() => setTimeout(() => stages.forEach((st) => warmIntro(st.id)), 800)));
 
   window.addEventListener('popstate', render);
   window.addEventListener('hashchange', render);
@@ -283,6 +299,7 @@
         <ul class="cards">${cards}</ul>
       </div>`);
     if (intros[stage.id]) showIntro(dialog.querySelector('.intro'), intros[stage.id]);
+    stage.items.forEach((it) => warmIntro(it.id)); // 이 단계 항목들의 카드뉴스 첫 장
     // 휴대폰에서 가로로 넘치면 지금 단계 탭이 보이게
     const cur = dialog.querySelector('.stagetab[aria-current]');
     if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'center' });
@@ -318,6 +335,22 @@
       </section>`;
   }
 
+  // 카드뉴스 그림 주소 (배포마다 ?v= 가 바뀌어 고친 카드뉴스가 바로 보임)
+  const introSrcs = (file) => (introPages[file]?.pages || []).map((p) => `${p}?v=${encodeURIComponent(version)}`);
+
+  // 미리 받아 두기: 열기 전에 첫 장을 받아 두면 누르자마자 보임 (같은 주소라 브라우저가 다시 받지 않음)
+  const warmed = new Set();
+  function warmIntro(id, all) {
+    const srcs = introSrcs(intros[id]);
+    for (const src of all ? srcs : srcs.slice(0, 1)) {
+      if (warmed.has(src)) continue;
+      warmed.add(src);
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = src;
+    }
+  }
+
   async function showIntro(box, file) {
     const track = box.querySelector('.intro__track');
     const dots = box.querySelector('.intro__dots');
@@ -325,7 +358,21 @@
     const prevCleanup = cleanup;
     let task;
     cleanup = () => { alive = false; if (task) task.destroy(); prevCleanup(); };
-    try {
+    const srcs = introSrcs(file);
+    const ok = srcs.length && await new Promise((done) => {
+      // 그림으로 바로 (첫 장을 못 받으면 예전처럼 PDF 를 그림)
+      const { w, h } = introPages[file];
+      track.innerHTML = srcs.map((src, j) => `<img class="intro__card" src="${esc(src)}" width="${w}" height="${h}"
+        alt="소개 카드 ${j + 1} / ${srcs.length}" decoding="async"${j ? '' : ' fetchpriority="high"'}>`).join('');
+      dots.innerHTML = '<span></span>'.repeat(srcs.length);
+      const first = track.firstElementChild;
+      if (first.complete && first.naturalWidth) return done(true);
+      first.addEventListener('load', () => done(true), { once: true });
+      first.addEventListener('error', () => done(false), { once: true });
+    });
+    if (!alive) return;
+    if (!ok) { track.replaceChildren(); dots.replaceChildren(); }
+    if (!ok) try {
       const lib = await loadPdfjs();
       task = lib.getDocument({ url: new URL(file, document.baseURI).href, cMapUrl: `${PDFJS}cmaps/`, cMapPacked: true, standardFontDataUrl: `${PDFJS}standard_fonts/` });
       track.innerHTML = LOADING;
@@ -350,6 +397,7 @@
       if (alive) { console.error(err); box.remove(); }
       return;
     }
+    if (!alive) return;
     const cards = [...track.children];
     const mark = () => {
       const k = Math.round(track.scrollLeft / Math.max(1, cards[0].offsetWidth));
