@@ -380,7 +380,7 @@ def prefetch(rows):
 
 def write_report(count, errors, warnings):
     """반영 결과 페이지(report.html, 사이트 주소/report) — 업로드하는 선생님들이 배포 기록 대신 봄.
-    사이트 어디에도 링크하지 않고 시트 메뉴 [반영 결과 보기]로만 엶. 로그인은 사이트와 같음"""
+    사이트 어디에도 링크하지 않고 시트 메뉴 [반영 결과 보기]로만 엶. (사이트가 공개라 주소를 알면 누구나 볼 수 있음)"""
     from html import escape
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
     def block(title, items, cls):

@@ -38,16 +38,10 @@ npm i @noonnu/gosanja && pip install fonttools brotli
 python3 tools/subset_font.py node_modules/@noonnu/gosanja/fonts/gosanja-normal.woff
 ```
 
-## 입장 비밀번호
+## 공개
 
-사이트 전체가 비밀번호로 잠겨 있습니다 (`functions/_middleware.js`). Cloudflare → gwresearch → 설정 → 변수 및 비밀:
-
-| 이름 | 종류 | 내용 |
-|---|---|---|
-| `SITE_PASSWORD` | 비밀(암호화) | 입장 비밀번호. **바꾸면 기존 로그인은 모두 풀림.** 없으면 사이트가 열리지 않음 |
-| `SESSION_HOURS` | 일반 텍스트 (선택) | 로그인 유지 시간(시간 단위), 기본 12 |
-
-비밀번호를 바꾼 뒤에는 한 번 다시 배포해야 적용됩니다 (시트의 [사이트 반영]).
+사이트는 로그인 없이 공개입니다 (`functions/_middleware.js`). Cloudflare 의 `SITE_PASSWORD`·`SESSION_HOURS` 는 더 쓰지 않습니다.
+다시 잠그려면 커밋 `1522495` 의 `functions/_middleware.js` 로 되돌리고 `SITE_PASSWORD` 를 설정합니다.
 
 ## 자료 넣는 법
 

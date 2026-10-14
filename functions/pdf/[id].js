@@ -1,5 +1,5 @@
 /**
- * /pdf/<드라이브 파일 id> — 드라이브 PDF 를 가져와 전달 (로그인은 _middleware.js 가 먼저 확인)
+ * /pdf/<드라이브 파일 id> — 드라이브 PDF 를 가져와 전달
  * - assets/data.json 에 있는 파일만 (아무 드라이브 파일이나 중계하지 않도록)
  * - Cloudflare 캐시에 7일 보관 → 두 번째부터는 드라이브를 거치지 않음
  *   보관 열쇠에 배포 번호(data.json 의 version)를 넣어, 사이트에 반영할 때마다 새로 받음
@@ -43,7 +43,7 @@ export async function onRequestGet({ params, request, env, waitUntil }) {
   return forBrowser(res);
 }
 
-// 브라우저·중간 캐시에는 로그인한 사람만 보도록 private (브라우저 보관은 예전처럼 1시간)
+// 브라우저 보관은 1시간 (고친 문서가 너무 늦게 보이지 않게)
 function forBrowser(res) {
   const out = new Response(res.body, res);
   out.headers.set('Cache-Control', `private, max-age=${BROWSER_TTL}`);
