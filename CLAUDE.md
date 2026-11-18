@@ -8,7 +8,7 @@
 - `assets/vendor/pdfjs/` pdf.js(외부 코드, 고치지 않는다). 검색할 때 이 폴더는 뺀다.
 - `assets/fonts/gosanja-subset.woff2` 제목 글자만 남긴 글꼴 — **제목 문구를 바꾸면 `tools/subset_font.py` 로 다시 만든다.**
 - 시안이 바뀌면 `python3 tools/extract.py` 로 에셋 재추출.
-- `functions/_middleware.js`(지금은 공개, 비밀번호 안 씀), `functions/pdf/[id].js` PDF 를 드라이브에서 가져와 Cloudflare 에 7일 보관.
+- `functions/_middleware.js`(지금은 공개, 비밀번호 안 씀. 숫자 6자리 주소 `gwansan.com/261218/` 등은 Ohweb 의 임시 페이지 `admin.kakainfo.com/temp/{번호}/` 를 대신 보여 줌), `functions/pdf/[id].js` PDF 를 드라이브에서 가져와 Cloudflare 에 7일 보관.
 
 ## DB
 - Firebase 없음. Cloudflare KV `gwresearch-pdf`, Google Apps Script(시트·드라이브).

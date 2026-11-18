@@ -12,8 +12,20 @@ const SHORTCUTS = {
   '/연구입력': 'https://script.google.com/macros/s/AKfycby4VTU5X9WWb91WUkrPG_f0klDqD8I9ulMKZrg6IOYgc6DwnKY7RoRj0myGp7UgmyAlTw/exec',
 };
 
+// gwansan.com/261218 같은 숫자 6자리 주소 → 행사용 임시 페이지
+// (RicardoBrian/Ohweb 의 ohweb/public/temp/{번호}/, admin.kakainfo.com/temp/{번호}/ 에 배포됨)
+const TEMP_ORIGIN = 'https://admin.kakainfo.com/temp';
+const TEMP_PATH = /^\/(\d{6})(\/.*)?$/;
+
 export async function onRequest({ request, next }) {
   const url = new URL(request.url);
+  const temp = url.pathname.match(TEMP_PATH);
+  if (temp) {
+    if (!temp[2]) return Response.redirect(new URL(`/${temp[1]}/${url.search}`, url), 301);
+    const res = await fetch(TEMP_ORIGIN + url.pathname + url.search, { method: request.method === 'HEAD' ? 'HEAD' : 'GET' });
+    if (res.status === 404) return next();
+    return fresh(res);
+  }
   const shortcut = SHORTCUTS[safeDecode(url.pathname).replace(/\/+$/, '')];
   if (shortcut) return Response.redirect(shortcut, 302);
   // 예전 로그인 주소로 들어와도 첫 화면으로
